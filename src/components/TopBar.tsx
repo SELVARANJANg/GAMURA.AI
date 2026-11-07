@@ -1,5 +1,5 @@
 import React from 'react';
-import { Menu, Edit3, Plus } from 'lucide-react';
+import { Menu, Edit3, Plus, User as UserIcon } from 'lucide-react';
 import { Connector } from '../types';
 
 interface TopBarProps {
@@ -11,6 +11,9 @@ interface TopBarProps {
   onOpenSheet: (tab?: 'c' | 's') => void;
   connectedCount: number;
   currentConnector?: Connector;
+  userNickname?: string | null;
+  userPhoto?: string | null;
+  onOpenAuth: () => void;
 }
 
 export const TopBar: React.FC<TopBarProps> = ({
@@ -22,6 +25,9 @@ export const TopBar: React.FC<TopBarProps> = ({
   onOpenSheet,
   connectedCount,
   currentConnector,
+  userNickname,
+  userPhoto,
+  onOpenAuth,
 }) => {
   // Caption based on mode
   let caption = '';
@@ -32,7 +38,7 @@ export const TopBar: React.FC<TopBarProps> = ({
   } else if (mode === 'compare') {
     caption = `Asking ${Math.min(connectedCount, 4)} AIs side by side`;
   } else {
-    caption = `${Math.min(connectedCount, 3)} AIs answer, ${currentConnector ? currentConnector.name : 'Gemini'} merges the best`;
+    caption = `${Math.min(connectedCount, 4)} AIs answer, ${currentConnector ? currentConnector.name : 'Gemini'} merges the best`;
   }
 
   return (
@@ -56,7 +62,34 @@ export const TopBar: React.FC<TopBarProps> = ({
         </div>
 
         {/* Right */}
-        <div className="flex items-center justify-end gap-2">
+        <div className="flex items-center justify-end gap-1.5 sm:gap-2">
+          {/* User Account / Apple ID Icon */}
+          <button
+            onClick={onOpenAuth}
+            className={`h-9 px-2.5 rounded-full flex items-center gap-1.5 transition-transform active:scale-90 text-[12.5px] font-semibold border ${
+              userNickname
+                ? 'bg-[var(--bg3)] text-[var(--tx)] border-[var(--ln)]'
+                : 'bg-[var(--bg3)]/60 text-[var(--mu)] hover:text-[var(--tx)] border-transparent'
+            }`}
+            aria-label={userNickname ? `Signed in as ${userNickname}` : 'Sign in'}
+            title={userNickname ? `Account: ${userNickname}` : 'Sign in with Apple / Gamura ID'}
+          >
+            {userPhoto ? (
+              <img
+                src={userPhoto}
+                alt={userNickname || 'User'}
+                className="w-5 h-5 rounded-full object-cover shrink-0"
+              />
+            ) : (
+              <div className="w-5 h-5 rounded-full bg-[var(--ac)] text-[var(--fg)] flex items-center justify-center text-[10px] font-bold shrink-0">
+                {userNickname ? userNickname[0].toUpperCase() : <UserIcon className="w-3 h-3 text-[var(--fg)]" />}
+              </div>
+            )}
+            <span className="hidden sm:inline max-w-[70px] truncate">
+              {userNickname || 'Sign in'}
+            </span>
+          </button>
+
           <button
             onClick={onNewChat}
             className="w-9 h-9 rounded-full bg-[var(--bg3)] flex items-center justify-center text-[var(--tx)] transition-transform active:scale-90 hover:opacity-90"
@@ -64,6 +97,7 @@ export const TopBar: React.FC<TopBarProps> = ({
           >
             <Edit3 className="w-4 h-4 text-[var(--tx)]" />
           </button>
+
           <button
             onClick={() => onOpenSheet('c')}
             className="w-9 h-9 rounded-full bg-[var(--ac)] text-[var(--fg)] flex items-center justify-center transition-transform active:scale-90 hover:opacity-95 shadow-sm"

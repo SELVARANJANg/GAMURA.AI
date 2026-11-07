@@ -20,13 +20,24 @@ import { MessageItem } from './components/MessageItem';
 import { HistoryDrawer } from './components/HistoryDrawer';
 import { ConnectorsSheet } from './components/ConnectorsSheet';
 import { PersonaModal } from './components/PersonaModal';
+import { AppleAuthModal } from './components/AppleAuthModal';
 import {
   queryModel,
   improvePrompt,
   streamCouncilVerdict,
 } from './services/aiService';
+import {
+  auth,
+  onAuthStateChanged,
+  logoutUser,
+  syncThreadToFirestore,
+  deleteThreadFromFirestore,
+  subscribeToUserThreads,
+  type User,
+} from './firebase/config';
 
 const STORAGE_KEY = 'gamura_ai_v2';
+const AUTH_SKIPPED_KEY = 'gamura_auth_skipped';
 
 function loadInitialState(): AppState {
   try {
@@ -34,8 +45,12 @@ function loadInitialState(): AppState {
     if (saved) {
       const parsed = JSON.parse(saved);
       if (parsed && Array.isArray(parsed.threads)) {
+        const initialConnected = Array.isArray(parsed.connected) && parsed.connected.length > 0
+          ? parsed.connected
+          : ['gemini', 'chatgpt', 'claude', 'deepseek', 'perplexity', 'nvidia'];
+
         return {
-          connected: parsed.connected || ['gemini'],
+          connected: initialConnected,
           current: parsed.current || 'gemini',
           custom: parsed.custom || [],
           threads: parsed.threads || [],
@@ -53,7 +68,7 @@ function loadInitialState(): AppState {
   }
 
   return {
-    connected: ['gemini'],
+    connected: ['gemini', 'chatgpt', 'claude', 'deepseek', 'perplexity', 'nvidia'],
     current: 'gemini',
     custom: [],
     threads: [],
@@ -66,20 +81,74 @@ function loadInitialState(): AppState {
   };
 }
 
+interface UserProfile {
+  uid: string;
+  nickname: string;
+  email: string | null;
+  photoURL: string | null;
+}
+
 export default function App() {
   const [state, setState] = useState<AppState>(loadInitialState);
+  const [currentUser, setCurrentUser] = useState<UserProfile | null>(null);
   const [isBusy, setIsBusy] = useState(false);
   const [isHistoryOpen, setIsHistoryOpen] = useState(false);
   const [isSheetOpen, setIsSheetOpen] = useState(false);
   const [sheetTab, setSheetTab] = useState<'c' | 's'>('c');
   const [isPersonaModalOpen, setIsPersonaModalOpen] = useState(false);
+  const [isAuthModalOpen, setIsAuthModalOpen] = useState(false);
   const [toastMessage, setToastMessage] = useState<string | null>(null);
 
   const abortControllerRef = useRef<AbortController | null>(null);
   const chatScrollRef = useRef<HTMLDivElement>(null);
   const toastTimeoutRef = useRef<any>(null);
 
-  // Save state to localStorage
+  // Track Firebase Auth State
+  useEffect(() => {
+    const unsubscribe = onAuthStateChanged(auth, (user: User | null) => {
+      if (user) {
+        const profile: UserProfile = {
+          uid: user.uid,
+          nickname: user.displayName || user.email?.split('@')[0] || 'Gamura User',
+          email: user.email,
+          photoURL: user.photoURL,
+        };
+        setCurrentUser(profile);
+      } else {
+        setCurrentUser(null);
+        // Prompt login if never logged in and never explicitly skipped
+        const skipped = localStorage.getItem(AUTH_SKIPPED_KEY);
+        if (!skipped) {
+          setIsAuthModalOpen(true);
+        }
+      }
+    });
+
+    return () => unsubscribe();
+  }, []);
+
+  // Real-Time Cloud Synchronization with Firestore when logged in
+  useEffect(() => {
+    if (!currentUser?.uid) return;
+
+    const unsubscribe = subscribeToUserThreads(currentUser.uid, (cloudThreads) => {
+      if (cloudThreads.length > 0) {
+        setState((prev) => {
+          // Merge cloud threads with local, preferring cloud
+          const existingIds = new Set(cloudThreads.map((t) => t.id));
+          const localOnly = prev.threads.filter((t) => !existingIds.has(t.id));
+          return {
+            ...prev,
+            threads: [...cloudThreads, ...localOnly],
+          };
+        });
+      }
+    });
+
+    return () => unsubscribe();
+  }, [currentUser?.uid]);
+
+  // Save state to localStorage for offline / instant availability
   useEffect(() => {
     try {
       localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
@@ -117,7 +186,20 @@ export default function App() {
     return () => mediaQuery.removeEventListener('change', handleSystemThemeChange);
   }, [state.theme, state.accent, state.size]);
 
-  // Auto scroll chat to bottom
+  // Handle escape key to close modals
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') {
+        setIsHistoryOpen(false);
+        setIsSheetOpen(false);
+        setIsPersonaModalOpen(false);
+        setIsAuthModalOpen(false);
+      }
+    };
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, []);
+
   const scrollToBottom = (behavior: ScrollBehavior = 'smooth') => {
     if (chatScrollRef.current) {
       chatScrollRef.current.scrollTo({
@@ -142,7 +224,7 @@ export default function App() {
     .filter((c): c is Connector => !!c);
 
   const currentConnector =
-    allConnectors.find((c) => c.id === state.current) || connectedConnectors[0];
+    allConnectors.find((c) => c.id === state.current) || connectedConnectors[0] || allConnectors[0];
 
   const currentThread: Thread | undefined = state.threads.find(
     (t) => t.id === state.active
@@ -167,10 +249,38 @@ export default function App() {
       abortControllerRef.current = null;
     }
     setIsBusy(false);
-    showToast('Stopped');
+    showToast('Generation stopped');
   };
 
-  // Send message
+  // Connect all models at once
+  const handleConnectAll = () => {
+    const allIds = allConnectors.map((c) => c.id);
+    setState((prev) => ({
+      ...prev,
+      connected: allIds,
+    }));
+    showToast('All 12+ AI models connected!');
+  };
+
+  // Skip Login (Guest Mode)
+  const handleSkipAuth = () => {
+    localStorage.setItem(AUTH_SKIPPED_KEY, 'true');
+    setIsAuthModalOpen(false);
+    showToast('Continuing as Guest');
+  };
+
+  // Sign out
+  const handleSignOut = async () => {
+    try {
+      await logoutUser();
+      setCurrentUser(null);
+      showToast('Signed out. You are now in Guest mode.');
+    } catch (err: any) {
+      showToast('Sign out error');
+    }
+  };
+
+  // Send message with Real-Time cloud sync
   const handleSend = async (rawText: string) => {
     let text = rawText.trim();
     if (!text || isBusy) return;
@@ -178,7 +288,7 @@ export default function App() {
     let targetMode = state.mode;
     let targetConnector = currentConnector;
 
-    // Check @model direct mention (e.g. "@claude write a poem")
+    // Direct @model mention support
     const mentionMatch = text.match(/^@(\w+)\s+([\s\S]+)/);
     if (mentionMatch) {
       const requestedName = mentionMatch[1].toLowerCase();
@@ -189,10 +299,12 @@ export default function App() {
       );
       if (matched) {
         if (!state.connected.includes(matched.id)) {
-          showToast(`${matched.name} is not connected yet`);
-          setIsSheetOpen(true);
-          setSheetTab('c');
-          return;
+          setState((prev) => ({
+            ...prev,
+            connected: [...prev.connected, matched.id],
+            current: matched.id,
+          }));
+          showToast(`Connected & switched to ${matched.name}`);
         }
         targetConnector = matched;
         text = mentionMatch[2];
@@ -201,7 +313,7 @@ export default function App() {
     }
 
     if (!connectedConnectors.length || !targetConnector) {
-      showToast('Connect an AI first');
+      showToast('Connect an AI model first');
       setIsSheetOpen(true);
       setSheetTab('c');
       return;
@@ -223,17 +335,20 @@ export default function App() {
       content: text,
     };
 
+    const participatingModels = connectedConnectors.slice(
+      0,
+      targetMode === 'compare' ? 4 : 4
+    );
+
     const assistantMessage: Message = {
       role: 'assistant',
       kind: targetMode,
       who: targetConnector.name,
       content: '',
-      step: targetMode === 'council' ? `Asking ${Math.min(connectedConnectors.length, 3)} AIs...` : '',
+      step: targetMode === 'council' ? `Asking ${participatingModels.length} AIs...` : '',
       cmp:
         targetMode !== 'chat'
-          ? connectedConnectors
-              .slice(0, targetMode === 'compare' ? 4 : 3)
-              .map((c) => ({ who: c.name, content: '' }))
+          ? participatingModels.map((c) => ({ who: c.name, content: '' }))
           : undefined,
     };
 
@@ -246,23 +361,19 @@ export default function App() {
         t: Date.now(),
       };
       threadId = newThreadItem.id;
+      thread = newThreadItem;
       setState((prev) => ({
         ...prev,
         threads: [newThreadItem, ...prev.threads],
         active: newThreadItem.id,
       }));
     } else {
+      const updatedMsgs = [...thread.msgs, userMessage, assistantMessage];
+      const updatedThread = { ...thread, t: Date.now(), msgs: updatedMsgs };
+      thread = updatedThread;
       setState((prev) => ({
         ...prev,
-        threads: prev.threads.map((t) =>
-          t.id === threadId
-            ? {
-                ...t,
-                t: Date.now(),
-                msgs: [...t.msgs, userMessage, assistantMessage],
-              }
-            : t
-        ),
+        threads: prev.threads.map((t) => (t.id === threadId ? updatedThread : t)),
       }));
     }
 
@@ -284,7 +395,12 @@ export default function App() {
           if (lastIdx >= 0) {
             updatedMsgs[lastIdx] = updater(updatedMsgs[lastIdx]);
           }
-          return { ...t, msgs: updatedMsgs };
+          const updatedT = { ...t, msgs: updatedMsgs };
+          // Real-time Firestore sync
+          if (currentUser?.uid) {
+            syncThreadToFirestore(currentUser.uid, updatedT);
+          }
+          return updatedT;
         }),
       }));
       scrollToBottom();
@@ -322,7 +438,7 @@ export default function App() {
               updateAssistantMessage((msg) => ({
                 ...msg,
                 err: true,
-                content: `${targetConnector.name} could not answer: ${err}. Open + to check connectors.`,
+                content: `${targetConnector.name} response: ${err}`,
               }));
             },
             onDone: () => {},
@@ -330,14 +446,9 @@ export default function App() {
           signal
         );
       } else {
-        // Compare or Council mode
-        const useConnectors = connectedConnectors.slice(
-          0,
-          targetMode === 'compare' ? 4 : 3
-        );
-
+        // Multi-model Compare or Council mode
         await Promise.all(
-          useConnectors.map((connector, idx) =>
+          participatingModels.map((connector, idx) =>
             queryModel(
               connector,
               fullMessages,
@@ -371,10 +482,9 @@ export default function App() {
         if (targetMode === 'council' && !signal.aborted) {
           updateAssistantMessage((msg) => ({
             ...msg,
-            step: `${targetConnector.name} is merging the best answers...`,
+            step: `${targetConnector.name} is evaluating and merging the best answers...`,
           }));
 
-          // Fetch the completed answers for council synthesis
           const currentThreadState = state.threads.find((t) => t.id === threadId);
           const currentLastMsg =
             currentThreadState?.msgs[currentThreadState.msgs.length - 1];
@@ -395,7 +505,7 @@ export default function App() {
                     judge: targetConnector.name,
                   }));
                 },
-                onError: (err) => {
+                onError: () => {
                   updateAssistantMessage((msg) => ({
                     ...msg,
                     content: 'Could not merge the answers. Open each AI’s answer below.',
@@ -413,7 +523,7 @@ export default function App() {
         updateAssistantMessage((msg) => ({
           ...msg,
           err: true,
-          content: msg.content || `Request failed: ${err.message || 'Unknown error'}`,
+          content: msg.content || `Notice: ${err.message || 'Stream completed'}`,
         }));
       }
     } finally {
@@ -432,7 +542,6 @@ export default function App() {
     if (!currentThread || isBusy) return;
     const userMsg = currentThread.msgs[index - 1];
     if (userMsg && userMsg.role === 'user') {
-      // Remove last assistant message and user message
       setState((prev) => ({
         ...prev,
         threads: prev.threads.map((t) =>
@@ -449,13 +558,13 @@ export default function App() {
   const handleCopy = (text: string) => {
     if (!text) return;
     navigator.clipboard?.writeText(text);
-    showToast('Copied');
+    showToast('Copied to clipboard');
   };
 
   // Text to speech
   const handleSpeak = (text: string) => {
     if (!window.speechSynthesis) {
-      showToast('Read aloud is not supported here');
+      showToast('Read aloud is not supported on this browser');
       return;
     }
     window.speechSynthesis.cancel();
@@ -495,12 +604,17 @@ export default function App() {
     a.download = `${currentThread.title.replace(/[^\w]+/g, '-')}.md`;
     a.click();
     URL.revokeObjectURL(url);
-    showToast('Chat exported');
+    showToast('Chat exported as Markdown');
   };
 
   // Delete All Chats
   const handleDeleteAllChats = () => {
     if (window.confirm('Delete all chats on this device?')) {
+      if (currentUser?.uid) {
+        state.threads.forEach((t) => {
+          deleteThreadFromFirestore(currentUser.uid, t.id);
+        });
+      }
       setState((prev) => ({
         ...prev,
         threads: [],
@@ -512,7 +626,7 @@ export default function App() {
   };
 
   return (
-    <div className="relative h-screen w-full overflow-hidden flex flex-col bg-[var(--bg)] text-[var(--tx)]">
+    <div className="relative h-[100dvh] w-full overflow-hidden flex flex-col bg-[var(--bg)] text-[var(--tx)]">
       {/* Background Animated Atmosphere */}
       <div id="au" aria-hidden="true">
         <i />
@@ -521,7 +635,7 @@ export default function App() {
 
       {/* Main App Container */}
       <div id="app" className="relative z-10 h-full w-full max-w-[820px] mx-auto flex flex-col">
-        {/* Top Bar */}
+        {/* Top Bar with Apple Profile badge */}
         <TopBar
           mode={state.mode}
           onModeChange={(mode) => setState((prev) => ({ ...prev, mode }))}
@@ -534,6 +648,9 @@ export default function App() {
           }}
           connectedCount={connectedConnectors.length}
           currentConnector={currentConnector}
+          userNickname={currentUser?.nickname}
+          userPhoto={currentUser?.photoURL}
+          onOpenAuth={() => setIsAuthModalOpen(true)}
         />
 
         {/* Chat Scroll Container */}
@@ -586,28 +703,39 @@ export default function App() {
         onSelectThread={(id) => setState((prev) => ({ ...prev, active: id }))}
         onNewChat={handleNewChat}
         onTogglePin={(id) =>
-          setState((prev) => ({
-            ...prev,
-            threads: prev.threads.map((t) =>
+          setState((prev) => {
+            const updated = prev.threads.map((t) =>
               t.id === id ? { ...t, pin: !t.pin } : t
-            ),
-          }))
+            );
+            const target = updated.find((t) => t.id === id);
+            if (target && currentUser?.uid) {
+              syncThreadToFirestore(currentUser.uid, target);
+            }
+            return { ...prev, threads: updated };
+          })
         }
         onRenameThread={(id, newTitle) =>
-          setState((prev) => ({
-            ...prev,
-            threads: prev.threads.map((t) =>
+          setState((prev) => {
+            const updated = prev.threads.map((t) =>
               t.id === id ? { ...t, title: newTitle } : t
-            ),
-          }))
+            );
+            const target = updated.find((t) => t.id === id);
+            if (target && currentUser?.uid) {
+              syncThreadToFirestore(currentUser.uid, target);
+            }
+            return { ...prev, threads: updated };
+          })
         }
-        onDeleteThread={(id) =>
+        onDeleteThread={(id) => {
+          if (currentUser?.uid) {
+            deleteThreadFromFirestore(currentUser.uid, id);
+          }
           setState((prev) => ({
             ...prev,
             threads: prev.threads.filter((t) => t.id !== id),
             active: prev.active === id ? null : prev.active,
-          }))
-        }
+          }));
+        }}
       />
 
       {/* Connectors & Settings Bottom Sheet */}
@@ -639,6 +767,7 @@ export default function App() {
             };
           })
         }
+        onConnectAll={handleConnectAll}
         onRemoveCustomConnector={(id) =>
           setState((prev) => ({
             ...prev,
@@ -666,6 +795,10 @@ export default function App() {
             };
           })
         }
+        userNickname={currentUser?.nickname}
+        userEmail={currentUser?.email}
+        onOpenAuth={() => setIsAuthModalOpen(true)}
+        onSignOut={handleSignOut}
         theme={state.theme}
         onThemeChange={(theme) => setState((prev) => ({ ...prev, theme }))}
         accent={state.accent}
@@ -683,6 +816,17 @@ export default function App() {
         onClose={() => setIsPersonaModalOpen(false)}
         selectedPersona={state.persona}
         onSelectPersona={(persona) => setState((prev) => ({ ...prev, persona }))}
+      />
+
+      {/* Apple-Style Authentication Modal */}
+      <AppleAuthModal
+        isOpen={isAuthModalOpen}
+        onClose={() => setIsAuthModalOpen(false)}
+        onSuccess={(nickname) => {
+          showToast(`Signed in as ${nickname}`);
+        }}
+        onSkip={handleSkipAuth}
+        onShowToast={showToast}
       />
 
       {/* Toast Notification */}

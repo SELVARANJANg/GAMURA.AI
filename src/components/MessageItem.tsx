@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { memo, useMemo } from 'react';
 import { Copy, Volume2, RotateCcw } from 'lucide-react';
 import { Message } from '../types';
 import { parseMarkdown } from '../utils/markdown';
@@ -13,7 +13,7 @@ interface MessageItemProps {
   onRedo: (index: number) => void;
 }
 
-export const MessageItem: React.FC<MessageItemProps> = ({
+const MessageItemComponent: React.FC<MessageItemProps> = ({
   message,
   index,
   isLast,
@@ -24,8 +24,8 @@ export const MessageItem: React.FC<MessageItemProps> = ({
 }) => {
   const isUser = message.role === 'user';
 
-  // Get raw text representation for copying or speech
-  const getRawText = (): string => {
+  // Memoize raw text representation for copying or speech
+  const rawText = useMemo((): string => {
     if (message.content) return message.content;
     if (message.cmp && message.cmp.length > 0) {
       return message.cmp
@@ -34,7 +34,13 @@ export const MessageItem: React.FC<MessageItemProps> = ({
         .join('\n\n');
     }
     return '';
-  };
+  }, [message.content, message.cmp]);
+
+  // Memoize parsed markdown HTML to avoid re-parsing on unrelated parent re-renders
+  const parsedContent = useMemo(() => {
+    if (!message.content) return '';
+    return parseMarkdown(message.content);
+  }, [message.content]);
 
   const handleCopyCode = (e: React.MouseEvent) => {
     const target = (e.target as HTMLElement).closest('.copy-code-btn') as HTMLElement;
@@ -53,7 +59,10 @@ export const MessageItem: React.FC<MessageItemProps> = ({
 
   if (isUser) {
     return (
-      <div className="self-end max-w-[86%] py-2.5 px-4 rounded-[20px] rounded-br-[6px] bg-[var(--ac)] text-[var(--fg)] text-[15px] leading-relaxed shadow-sm break-words whitespace-pre-wrap animate-in fade-in slide-in-from-bottom-1 duration-200">
+      <div
+        style={{ contentVisibility: 'auto', containIntrinsicSize: '60px' }}
+        className="self-end max-w-[86%] py-2.5 px-4 rounded-[20px] rounded-br-[6px] bg-[var(--ac)] text-[var(--fg)] text-[15px] leading-relaxed shadow-sm break-words whitespace-pre-wrap animate-in fade-in slide-in-from-bottom-1 duration-150"
+      >
         {message.content}
       </div>
     );
@@ -65,11 +74,12 @@ export const MessageItem: React.FC<MessageItemProps> = ({
   return (
     <div
       onClick={handleCopyCode}
+      style={{ contentVisibility: 'auto', containIntrinsicSize: isWide ? '180px' : '90px' }}
       className={`self-start ${
         isWide ? 'w-full max-w-full' : 'max-w-[88%]'
       } py-3 px-4 rounded-[20px] rounded-bl-[6px] bg-[var(--bg2)] border ${
         message.err ? 'border-[var(--rd)]' : 'border-[var(--ln)]'
-      } text-[var(--tx)] text-[15px] leading-relaxed break-words shadow-sm animate-in fade-in slide-in-from-bottom-1 duration-200`}
+      } text-[var(--tx)] text-[15px] leading-relaxed break-words shadow-sm animate-in fade-in slide-in-from-bottom-1 duration-150`}
     >
       {/* Compare Mode */}
       {message.kind === 'compare' && (
@@ -112,11 +122,11 @@ export const MessageItem: React.FC<MessageItemProps> = ({
             Council verdict by {message.judge || 'AI'}
           </div>
 
-          {message.content ? (
+          {parsedContent ? (
             <div
               className="prose-content leading-relaxed"
               dangerouslySetInnerHTML={{
-                __html: parseMarkdown(message.content),
+                __html: parsedContent,
               }}
             />
           ) : (
@@ -175,11 +185,11 @@ export const MessageItem: React.FC<MessageItemProps> = ({
             {message.who || 'AI'}
           </div>
 
-          {message.content ? (
+          {parsedContent ? (
             <div
               className="prose-content leading-relaxed"
               dangerouslySetInnerHTML={{
-                __html: parseMarkdown(message.content),
+                __html: parsedContent,
               }}
             />
           ) : (
@@ -201,7 +211,7 @@ export const MessageItem: React.FC<MessageItemProps> = ({
       {message.done && (
         <div className="flex items-center gap-1 mt-2.5 -ml-1 text-[var(--mu)]">
           <button
-            onClick={() => onCopy(getRawText())}
+            onClick={() => onCopy(rawText)}
             className="w-7 h-7 rounded-full flex items-center justify-center hover:bg-[var(--bg3)] hover:text-[var(--tx)] transition-colors"
             aria-label="Copy"
             title="Copy"
@@ -209,7 +219,7 @@ export const MessageItem: React.FC<MessageItemProps> = ({
             <Copy className="w-3.5 h-3.5" />
           </button>
           <button
-            onClick={() => onSpeak(getRawText())}
+            onClick={() => onSpeak(rawText)}
             className="w-7 h-7 rounded-full flex items-center justify-center hover:bg-[var(--bg3)] hover:text-[var(--tx)] transition-colors"
             aria-label="Read aloud"
             title="Read aloud"
@@ -231,3 +241,34 @@ export const MessageItem: React.FC<MessageItemProps> = ({
     </div>
   );
 };
+
+// Optimized React.memo comparison: only re-render if message content, step, done state, or last-message status changes
+export const MessageItem = memo(MessageItemComponent, (prevProps, nextProps) => {
+  // If last-message status or busy status changed, update
+  if (prevProps.isLast !== nextProps.isLast) return false;
+  if (prevProps.isBusy !== nextProps.isBusy) return false;
+  if (prevProps.index !== nextProps.index) return false;
+
+  const prev = prevProps.message;
+  const next = nextProps.message;
+
+  if (prev.content !== next.content) return false;
+  if (prev.step !== next.step) return false;
+  if (prev.done !== next.done) return false;
+  if (prev.err !== next.err) return false;
+  if (prev.who !== next.who) return false;
+  if (prev.kind !== next.kind) return false;
+
+  // For multi-model compare or council, check cmp items
+  if (prev.cmp !== next.cmp) {
+    if (!prev.cmp || !next.cmp) return false;
+    if (prev.cmp.length !== next.cmp.length) return false;
+    for (let i = 0; i < prev.cmp.length; i++) {
+      if (prev.cmp[i].content !== next.cmp[i].content || prev.cmp[i].err !== next.cmp[i].err) {
+        return false;
+      }
+    }
+  }
+
+  return true;
+});

@@ -5,6 +5,7 @@ export interface Connector {
   model: string;
   color: string;
   desc: string;
+  badge?: string;
   custom?: boolean;
 }
 
@@ -53,21 +54,123 @@ export interface AppState {
 }
 
 export const DEFAULT_CONNECTORS: Connector[] = [
-  { id: "gemini", name: "Gemini", by: "Google", model: "gemini-3.8-flash", color: "#6ea8ff", desc: "Fast all-round assistant." },
-  { id: "chatgpt", name: "ChatGPT", by: "OpenAI", model: "gpt-4o-mini", color: "#19d07f", desc: "Writing, coding and ideas." },
-  { id: "claude", name: "Claude", by: "Anthropic", model: "claude-sonnet-4", color: "#ffb26b", desc: "Careful, detailed answers." },
-  { id: "deepseek", name: "DeepSeek", by: "DeepSeek", model: "deepseek-chat", color: "#7aa2ff", desc: "Reasoning and code." },
-  { id: "llama", name: "Llama", by: "Meta", model: "openrouter:meta-llama/llama-3.3-70b-instruct", color: "#c79bff", desc: "Quick open model for daily chat." },
-  { id: "mistral", name: "Mistral", by: "Mistral AI", model: "mistral-large-latest", color: "#ffd36b", desc: "Compact and multilingual." }
+  {
+    id: "gemini",
+    name: "Gemini",
+    by: "Google",
+    model: "gemini-3.8-flash",
+    color: "#4285f4",
+    desc: "Google's ultra-fast multimodal intelligence.",
+    badge: "Built-in"
+  },
+  {
+    id: "chatgpt",
+    name: "ChatGPT",
+    by: "OpenAI",
+    model: "gpt-4o-mini",
+    color: "#10a37f",
+    desc: "Versatile reasoning, creative writing & code.",
+    badge: "Fast"
+  },
+  {
+    id: "claude",
+    name: "Claude",
+    by: "Anthropic",
+    model: "claude-sonnet-4",
+    color: "#d97706",
+    desc: "Thoughtful, deep analysis and nuanced prose.",
+    badge: "Reasoning"
+  },
+  {
+    id: "deepseek",
+    name: "DeepSeek",
+    by: "DeepSeek",
+    model: "deepseek-chat",
+    color: "#3b82f6",
+    desc: "Advanced logic, math & algorithmic reasoning.",
+    badge: "Coding"
+  },
+  {
+    id: "perplexity",
+    name: "Perplexity",
+    by: "Perplexity AI",
+    model: "sonar-reasoning",
+    color: "#20b2aa",
+    desc: "Real-time search grounding and cited answers.",
+    badge: "Search"
+  },
+  {
+    id: "nvidia",
+    name: "NVIDIA",
+    by: "NVIDIA NIM",
+    model: "llama-3.1-nemotron-70b-instruct",
+    color: "#76b900",
+    desc: "High-precision enterprise reasoning & instructions.",
+    badge: "Enterprise"
+  },
+  {
+    id: "openrouter",
+    name: "OpenRouter",
+    by: "OpenRouter",
+    model: "auto-router-best",
+    color: "#9333ea",
+    desc: "Multi-provider routing & open meta-intelligence.",
+    badge: "Universal"
+  },
+  {
+    id: "muse",
+    name: "Muse",
+    by: "Muse AI",
+    model: "muse-creative-v2",
+    color: "#ec4899",
+    desc: "Artistic ideation, storytelling & aesthetic design.",
+    badge: "Creative"
+  },
+  {
+    id: "llama",
+    name: "Llama",
+    by: "Meta",
+    model: "openrouter:meta-llama/llama-3.3-70b-instruct",
+    color: "#8b5cf6",
+    desc: "Meta's flagship open-weights champion.",
+    badge: "Open"
+  },
+  {
+    id: "mistral",
+    name: "Mistral",
+    by: "Mistral AI",
+    model: "mistral-large-latest",
+    color: "#f59e0b",
+    desc: "Compact, lightning-fast multilingual reasoning.",
+    badge: "European"
+  },
+  {
+    id: "grok",
+    name: "Grok",
+    by: "xAI",
+    model: "grok-2",
+    color: "#ef4444",
+    desc: "Witty, truthful, and real-time bold insights.",
+    badge: "Unfiltered"
+  },
+  {
+    id: "qwen",
+    name: "Qwen",
+    by: "Alibaba",
+    model: "qwen-2.5-72b-instruct",
+    color: "#0284c7",
+    desc: "Exceptional multilingual math & STEM reasoning.",
+    badge: "Multilingual"
+  }
 ];
 
 export const PERSONAS: Record<string, PersonaInfo> = {
-  general: { title: "Assistant", instruction: "You are Gamura AI, a helpful and accurate assistant. Be clear and concise." },
-  code: { title: "Coder", instruction: "You are an expert software engineer. Give working code with short explanations." },
-  tutor: { title: "Tutor", instruction: "You are a patient tutor. Explain step by step with simple examples." },
-  write: { title: "Writer", instruction: "You are a skilled writer and editor. Produce polished, natural prose." },
-  trans: { title: "Translator", instruction: "You are a translator. Translate faithfully into the language the user asks for, or English if unspecified." },
-  fun: { title: "Playful", instruction: "You are witty and playful but still helpful. Keep answers short." },
+  general: { title: "Assistant", instruction: "You are Gamura AI, a helpful, intelligent, and concise assistant. Deliver clear, accurate, and structured answers." },
+  code: { title: "Coder", instruction: "You are an elite software architect and senior engineer. Provide production-grade, bug-free code with brief, illuminating explanations." },
+  tutor: { title: "Tutor", instruction: "You are a warm and patient expert tutor. Explain concepts step by step with vivid real-world analogies and intuitive examples." },
+  write: { title: "Writer", instruction: "You are a master essayist, editor, and creative writer. Produce captivating, articulate, and polished prose." },
+  trans: { title: "Translator", instruction: "You are a world-class polyglot translator. Translate faithfully and idiomatically preserving cultural nuance and tone." },
+  fun: { title: "Playful", instruction: "You are witty, humorous, and entertaining while remaining genuinely helpful. Keep responses lively and clever." },
 };
 
 export const ACCENTS: Record<string, [string, string]> = {

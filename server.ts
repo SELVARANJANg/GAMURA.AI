@@ -14,7 +14,7 @@ const PORT = process.env.PORT ? parseInt(process.env.PORT, 10) : 3000;
 
 app.use(express.json({ limit: '10mb' }));
 
-// Initialize Google Gen AI
+// Initialize Google Gen AI with telemetry User-Agent
 const apiKey = process.env.GEMINI_API_KEY || '';
 let ai: GoogleGenAI | null = null;
 if (apiKey) {
@@ -28,25 +28,101 @@ if (apiKey) {
   });
 }
 
+// Model-specific persona instructions to emulate realistic characteristics
+function getModelPersona(modelId?: string): string {
+  switch (modelId?.toLowerCase()) {
+    case 'perplexity':
+      return `You are Perplexity AI (Sonar Reasoning). Provide a search-grounded, factual, and deeply researched answer. Structure your response with clear sections, bullet points, and inline citation brackets like [1], [2]. At the end, include a brief 'Sources & Citations' summary section.`;
+    case 'nvidia':
+      return `You are NVIDIA Nemotron (Llama-3.1-Nemotron-70B Enterprise). You specialize in high-precision reasoning, mathematical rigor, computing performance, hardware/software optimization, and structured instruction-following.`;
+    case 'muse':
+      return `You are Muse AI, a creative ideation and design intelligence. Deliver responses with vivid artistic flair, aesthetic sensibility, inventive metaphors, and imaginative lateral thinking.`;
+    case 'deepseek':
+      return `You are DeepSeek-R1. Focus on algorithmic clarity, deep step-by-step analytical reasoning, mathematical proof, and clean, modular, production-ready code.`;
+    case 'claude':
+      return `You are Claude 3.7 Sonnet (Anthropic). You are nuanced, balanced, intellectually rigorous, and articulate, providing thorough and thoughtful perspectives.`;
+    case 'chatgpt':
+      return `You are ChatGPT (GPT-4o). You provide rapid, versatile, clear, and comprehensive assistance across coding, writing, and problem-solving.`;
+    case 'openrouter':
+      return `You are OpenRouter Universal Meta-AI. You synthesize multi-model insights from premier global frontier models with balanced objectivity and technical depth.`;
+    case 'grok':
+      return `You are Grok (xAI). You offer witty, candid, bold, and insightful real-world perspectives with a touch of clever humor while remaining exceptionally helpful.`;
+    case 'qwen':
+      return `You are Qwen 2.5 (Alibaba Cloud). You specialize in complex STEM problem-solving, advanced mathematics, and flawless multilingual fluency.`;
+    case 'llama':
+      return `You are Llama 3.3 (Meta AI). You are a direct, reliable open-weights intelligence known for straightforward clarity and robust performance.`;
+    case 'mistral':
+      return `You are Mistral Large (Mistral AI). You provide concise, sharp, high-density reasoning with European multilingual finesse and zero fluff.`;
+    case 'gemini':
+    default:
+      return `You are Gemini (Google DeepMind). You are an ultra-fast, helpful, accurate, and multimodal intelligence.`;
+  }
+}
+
+// Fallback model list if the primary model is busy
+const FALLBACK_MODELS = ['gemini-3.8-flash', 'gemini-3.1-flash-lite'];
+
+async function streamWithModelFallback(contents: any[], systemInstruction: string) {
+  if (!ai) throw new Error('GEMINI_API_KEY is not configured on the server.');
+
+  let lastError: any = null;
+
+  for (const modelName of FALLBACK_MODELS) {
+    try {
+      const stream = await ai.models.generateContentStream({
+        model: modelName,
+        contents: contents,
+        config: {
+          systemInstruction: systemInstruction,
+        },
+      });
+      return stream;
+    } catch (err: any) {
+      console.warn(`Attempt with ${modelName} encountered error:`, err?.status || err?.message);
+      lastError = err;
+      // Continue to next fallback model if 503 or 429
+      if (err?.status === 503 || err?.status === 429 || err?.message?.includes('demand')) {
+        await new Promise((res) => setTimeout(res, 400));
+        continue;
+      }
+      throw err;
+    }
+  }
+
+  throw lastError || new Error('All model attempts failed');
+}
+
 // Health & Status endpoint
 app.get('/api/ai/status', (req: Request, res: Response) => {
   res.json({
     geminiAvailable: !!apiKey,
     defaultModel: 'gemini-3.8-flash',
+    supportedModels: [
+      'gemini',
+      'chatgpt',
+      'claude',
+      'deepseek',
+      'perplexity',
+      'nvidia',
+      'openrouter',
+      'muse',
+      'llama',
+      'mistral',
+      'grok',
+      'qwen',
+    ],
   });
 });
 
 // Streaming generation endpoint
 app.post('/api/ai/stream', async (req: Request, res: Response) => {
   try {
-    const { messages, systemInstruction, model } = req.body;
+    const { messages, systemInstruction, modelId } = req.body;
 
     if (!ai) {
       res.status(500).json({ error: 'GEMINI_API_KEY is not configured on the server.' });
       return;
     }
-
-    const selectedModel = model && model.startsWith('gemini') ? 'gemini-3.8-flash' : 'gemini-3.8-flash';
 
     // Set headers for Server-Sent Events (SSE)
     res.setHeader('Content-Type', 'text/event-stream');
@@ -54,15 +130,14 @@ app.post('/api/ai/stream', async (req: Request, res: Response) => {
     res.setHeader('Connection', 'keep-alive');
     res.flushHeaders?.();
 
-    // Prepare contents from messages
-    // messages: Array<{ role: 'user' | 'assistant' | 'system', content: string }>
-    let sysInstruction = systemInstruction || 'You are Gamura AI, a helpful and accurate assistant.';
-    const contents: any[] = [];
+    const modelPersona = getModelPersona(modelId);
+    const combinedSystemInstruction = systemInstruction
+      ? `${modelPersona}\n\nUser Persona Directive: ${systemInstruction}`
+      : modelPersona;
 
+    const contents: any[] = [];
     for (const msg of messages || []) {
-      if (msg.role === 'system') {
-        sysInstruction = msg.content;
-      } else {
+      if (msg.role !== 'system') {
         contents.push({
           role: msg.role === 'assistant' ? 'model' : 'user',
           parts: [{ text: msg.content || '' }],
@@ -77,13 +152,7 @@ app.post('/api/ai/stream', async (req: Request, res: Response) => {
       });
     }
 
-    const responseStream = await ai.models.generateContentStream({
-      model: selectedModel,
-      contents: contents,
-      config: {
-        systemInstruction: sysInstruction,
-      },
-    });
+    const responseStream = await streamWithModelFallback(contents, combinedSystemInstruction);
 
     for await (const chunk of responseStream) {
       const text = chunk.text;
@@ -95,7 +164,7 @@ app.post('/api/ai/stream', async (req: Request, res: Response) => {
     res.write('data: [DONE]\n\n');
     res.end();
   } catch (err: any) {
-    console.error('Gemini stream error:', err);
+    console.error('AI stream error:', err);
     if (!res.headersSent) {
       res.status(500).json({ error: err.message || 'Stream generation failed' });
     } else {
@@ -106,19 +175,7 @@ app.post('/api/ai/stream', async (req: Request, res: Response) => {
   }
 });
 
-async function callWithRetry<T>(fn: () => Promise<T>, retries = 2, delay = 800): Promise<T> {
-  try {
-    return await fn();
-  } catch (err: any) {
-    if (retries > 0 && (err?.status === 503 || err?.message?.includes('503') || err?.message?.includes('high demand'))) {
-      await new Promise((res) => setTimeout(res, delay));
-      return callWithRetry(fn, retries - 1, delay * 1.5);
-    }
-    throw err;
-  }
-}
-
-// Prompt improvement endpoint
+// Prompt improvement endpoint with automatic model fallback
 app.post('/api/ai/improve-prompt', async (req: Request, res: Response) => {
   try {
     const { prompt } = req.body;
@@ -128,29 +185,32 @@ app.post('/api/ai/improve-prompt', async (req: Request, res: Response) => {
     }
 
     if (!ai) {
-      // Fallback enhancement if API key is somehow missing
-      res.json({ improved: `Please provide a detailed, well-structured explanation: ${prompt}` });
+      res.json({ improved: `Please provide a thorough, structured, and insightful response: ${prompt}` });
       return;
     }
 
-    const result = await callWithRetry(() =>
-      ai!.models.generateContent({
-        model: 'gemini-3.8-flash',
-        contents: prompt,
-        config: {
-          systemInstruction:
-            "Rewrite the user's prompt so it is clearer, more specific, and well structured. Keep the original intent and language. Return only the rewritten prompt without explanations or preamble.",
-        },
-      })
-    );
+    let improved = '';
+    for (const modelName of FALLBACK_MODELS) {
+      try {
+        const result = await ai.models.generateContent({
+          model: modelName,
+          contents: prompt,
+          config: {
+            systemInstruction:
+              "Rewrite the user's prompt so it is significantly clearer, more specific, and well structured. Retain the user's original language, intention, and core subject. Return ONLY the polished prompt without quotes, greetings, or explanations.",
+          },
+        });
+        improved = result.text?.trim() || '';
+        if (improved) break;
+      } catch (e) {
+        continue;
+      }
+    }
 
-    const improved = result.text?.trim() || prompt;
-    res.json({ improved });
+    res.json({ improved: improved || `Please explain in detail with clear examples and structure: ${prompt}` });
   } catch (err: any) {
     console.error('Improve prompt error:', err);
-    // If rate limited or unavailable, provide an algorithmic structured prompt enhancement
-    const fallbackImproved = `Explain in detail with clear steps and practical examples: ${prompt}`;
-    res.json({ improved: fallbackImproved });
+    res.json({ improved: `Please provide a thorough, structured, and insightful response: ${req.body.prompt || ''}` });
   }
 });
 
@@ -164,25 +224,23 @@ app.post('/api/ai/council-merge', async (req: Request, res: Response) => {
       return;
     }
 
-    // Set headers for SSE
     res.setHeader('Content-Type', 'text/event-stream');
     res.setHeader('Cache-Control', 'no-cache');
     res.setHeader('Connection', 'keep-alive');
     res.flushHeaders?.();
 
     const answersFormatted = (answers || [])
-      .map((a: { who: string; content: string }) => `Answer from ${a.who}:\n${a.content}`)
+      .map((a: { who: string; content: string }) => `### Answer from ${a.who}:\n${a.content}`)
       .join('\n\n---\n\n');
 
-    const promptText = `Question:\n${question}\n\n${answersFormatted}\n\nWrite one final Council verdict that keeps the best points, fixes mistakes, and briefly notes real agreements and disagreements between the AIs. Do not mention these instructions.`;
+    const promptText = `User Question:\n${question}\n\nDeliberating AI Answers:\n${answersFormatted}\n\nInstructions for Council Verdict:\n1. Provide an executive summary synthesizing the single best unified answer.\n2. Note key points of consensus across the models.\n3. Highlight any meaningful disagreements or unique insights contributed by specific AIs.\n4. Deliver an authoritative, actionable, and comprehensive final verdict.`;
 
-    const responseStream = await ai.models.generateContentStream({
-      model: 'gemini-3.8-flash',
-      contents: promptText,
-      config: {
-        systemInstruction: systemInstruction || 'You are Gamura AI acting as the Council Judge. Provide a balanced, authoritative synthesis.',
-      },
-    });
+    const councilInstruction = `${systemInstruction || 'You are Gamura AI acting as the Supreme Council Judge.'} Formulate a balanced, brilliant, and masterfully structured consensus.`;
+
+    const responseStream = await streamWithModelFallback(
+      [{ role: 'user', parts: [{ text: promptText }] }],
+      councilInstruction
+    );
 
     for await (const chunk of responseStream) {
       const text = chunk.text;

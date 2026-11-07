@@ -1,5 +1,5 @@
 import React, { useRef, useEffect, useState } from 'react';
-import { Mic, Sparkles, ArrowUp, Square } from 'lucide-react';
+import { Mic, Sparkles, ArrowUp, Square, ChevronDown } from 'lucide-react';
 import { Connector, PERSONAS } from '../types';
 
 interface DockInputProps {
@@ -35,11 +35,12 @@ export const DockInput: React.FC<DockInputProps> = ({
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const recognitionRef = useRef<any>(null);
 
-  // Auto-resize textarea
+  // Auto-resize textarea smoothly
   const adjustHeight = () => {
     if (textareaRef.current) {
       textareaRef.current.style.height = 'auto';
-      textareaRef.current.style.height = `${Math.min(textareaRef.current.scrollHeight, 140)}px`;
+      const newHeight = Math.min(textareaRef.current.scrollHeight, 140);
+      textareaRef.current.style.height = `${newHeight}px`;
     }
   };
 
@@ -47,18 +48,20 @@ export const DockInput: React.FC<DockInputProps> = ({
     adjustHeight();
   }, [text]);
 
-  // Speech Recognition setup
+  // Speech Recognition setup with robust fallback
   const toggleRecording = () => {
     const SpeechRecognition =
       window.SpeechRecognition || window.webkitSpeechRecognition;
 
     if (!SpeechRecognition) {
-      onShowToast('Voice input is not supported in this browser.');
+      onShowToast('Voice recognition is not supported in this browser.');
       return;
     }
 
     if (isRecording) {
-      recognitionRef.current?.stop();
+      try {
+        recognitionRef.current?.stop();
+      } catch (e) {}
       setIsRecording(false);
       return;
     }
@@ -90,9 +93,11 @@ export const DockInput: React.FC<DockInputProps> = ({
       recognitionRef.current = recognition;
       recognition.start();
       setIsRecording(true);
+      onShowToast('Listening... Speak now');
     } catch (e) {
       console.error('Speech recognition error:', e);
       setIsRecording(false);
+      onShowToast('Microphone access unavailable');
     }
   };
 
@@ -114,7 +119,7 @@ export const DockInput: React.FC<DockInputProps> = ({
   const handleKeyDown = (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
     if (e.key === 'Enter' && !e.shiftKey) {
       // Don't submit on mobile touch keyboards
-      if (!/Mobi|Android/i.test(navigator.userAgent)) {
+      if (!/Mobi|Android|iPhone|iPad/i.test(navigator.userAgent)) {
         e.preventDefault();
         handleSubmit(e);
       }
@@ -124,7 +129,7 @@ export const DockInput: React.FC<DockInputProps> = ({
   const handleWandClick = async () => {
     const trimmed = text.trim();
     if (!trimmed) {
-      onShowToast('Type a prompt first');
+      onShowToast('Type a prompt first to enhance it');
       return;
     }
     setIsImproving(true);
@@ -132,9 +137,9 @@ export const DockInput: React.FC<DockInputProps> = ({
       await onImprovePrompt(trimmed, (updated) => {
         setText(updated);
       });
-      onShowToast('Prompt improved!');
+      onShowToast('Prompt optimized & structured!');
     } catch (err) {
-      onShowToast('Could not improve prompt');
+      onShowToast('Could not optimize prompt');
     } finally {
       setIsImproving(false);
     }
@@ -143,61 +148,70 @@ export const DockInput: React.FC<DockInputProps> = ({
   const personaTitle = PERSONAS[selectedPersona]?.title || 'Assistant';
 
   return (
-    <div id="dock" className="shrink-0 pb-[calc(10px+env(safe-area-inset-bottom,0px))] select-none">
+    <div id="dock" className="shrink-0 pb-[calc(10px+env(safe-area-inset-bottom,0px))] px-2 select-none z-20">
       {/* Chips row */}
       <div
         id="chips"
-        className="flex gap-2 overflow-x-auto px-3.5 py-1.5 pb-2 no-scrollbar"
+        className="flex gap-2 overflow-x-auto px-2 py-1.5 pb-2.5 no-scrollbar scroll-smooth items-center"
       >
+        {/* Persona Pill */}
+        <button
+          onClick={onOpenPersonaModal}
+          className="shrink-0 py-1.5 px-3 rounded-full text-[12.5px] font-semibold bg-[var(--bg3)] text-[var(--tx)] hover:bg-[var(--bg2)] transition-all flex items-center gap-1 border border-[var(--ln)] shadow-xs active:scale-95"
+          aria-label="Select Persona"
+        >
+          <span>{personaTitle}</span>
+          <ChevronDown className="w-3.5 h-3.5 text-[var(--mu)]" />
+        </button>
+
+        <div className="w-[1px] h-4 bg-[var(--ln)] shrink-0 my-auto" />
+
+        {/* Model Chips */}
         {connectedConnectors.map((c) => {
           const isSelected = c.id === currentConnectorId;
           const isInMultiMode = mode !== 'chat';
 
-          let chipClass = 'bg-[var(--bg3)] text-[var(--tx)]';
+          let chipClass = 'bg-[var(--bg3)] text-[var(--tx)] hover:bg-[var(--bg2)] border border-[var(--ln)]';
           if (isSelected) {
-            chipClass = 'bg-[var(--ac)] text-[var(--fg)] shadow-sm';
+            chipClass = 'bg-[var(--ac)] text-[var(--fg)] shadow-sm font-bold border-transparent';
           } else if (isInMultiMode) {
-            chipClass = 'bg-[var(--bg3)] text-[var(--tx)] ring-1.5 ring-[var(--ac)]';
+            chipClass = 'bg-[var(--bg3)] text-[var(--tx)] ring-1 ring-[var(--ac)]/60 font-medium';
           }
 
           return (
             <button
               key={c.id}
               onClick={() => onSelectConnector(c.id)}
-              className={`shrink-0 py-1.5 px-3.5 rounded-full text-[13px] font-semibold transition-all ${chipClass}`}
+              className={`shrink-0 py-1.5 px-3.5 rounded-full text-[12.5px] transition-all flex items-center gap-1.5 active:scale-95 ${chipClass}`}
             >
-              {c.name}
+              <span
+                className="w-2 h-2 rounded-full shrink-0"
+                style={{ backgroundColor: isSelected ? 'currentColor' : c.color }}
+              />
+              <span>{c.name}</span>
             </button>
           );
         })}
-
-        {/* Persona Pill */}
-        <button
-          onClick={onOpenPersonaModal}
-          className="shrink-0 py-1.5 px-3.5 rounded-full text-[13px] font-semibold bg-[var(--bg3)] text-[var(--tx)] hover:bg-[var(--bg2)] transition-all flex items-center gap-1.5"
-          aria-label="Select Persona"
-        >
-          <span>{personaTitle}</span>
-        </button>
       </div>
 
-      {/* Input Form Pill */}
+      {/* Input Pill Form */}
       <form
         onSubmit={handleSubmit}
-        className="glass flex items-end gap-1.5 mx-2.5 p-1.5 rounded-[26px] border border-[var(--ln)] shadow-lg transition-all focus-within:border-[var(--ac)]/60"
+        className="glass flex items-end gap-1.5 p-1.5 rounded-[26px] border border-[var(--ln)] shadow-lg transition-all focus-within:border-[var(--ac)]/70 focus-within:shadow-[0_0_15px_rgba(25,208,127,0.12)]"
       >
         {/* Mic Button */}
         <button
           type="button"
           onClick={toggleRecording}
-          className={`w-9 h-9 rounded-full flex items-center justify-center transition-all ${
+          className={`w-9 h-9 rounded-full flex items-center justify-center transition-all shrink-0 active:scale-90 ${
             isRecording
-              ? 'bg-[var(--rd)] text-white rec-pulse'
+              ? 'bg-[var(--rd)] text-white rec-pulse shadow-md'
               : 'text-[var(--mu)] hover:text-[var(--tx)]'
           }`}
           aria-label="Voice input"
+          title="Voice input"
         >
-          <Mic className="w-5 h-5" />
+          <Mic className="w-4.5 h-4.5" />
         </button>
 
         {/* Textarea Input */}
@@ -207,38 +221,40 @@ export const DockInput: React.FC<DockInputProps> = ({
           value={text}
           onChange={(e) => setText(e.target.value)}
           onKeyDown={handleKeyDown}
-          placeholder="Message Gamura AI"
-          className="flex-1 resize-none border-0 outline-none bg-transparent py-2 px-1 text-[var(--tx)] placeholder:text-[var(--mu)] min-h-[36px] max-h-[140px] leading-relaxed text-[15.5px]"
+          placeholder={mode === 'compare' ? 'Ask all connected AIs side by side...' : mode === 'council' ? 'Ask the AI Council to deliberate...' : 'Message Gamura AI...'}
+          className="flex-1 resize-none border-0 outline-none bg-transparent py-2 px-1 text-[var(--tx)] placeholder:text-[var(--mu)] min-h-[36px] max-h-[140px] leading-relaxed text-[15px]"
         />
 
         {/* Sparkle Wand Button */}
         <button
           type="button"
           onClick={handleWandClick}
-          disabled={isImproving}
-          className={`w-9 h-9 rounded-full flex items-center justify-center transition-all ${
+          disabled={isImproving || !text.trim()}
+          className={`w-9 h-9 rounded-full flex items-center justify-center transition-all shrink-0 disabled:opacity-30 disabled:pointer-events-none active:scale-90 ${
             isImproving
               ? 'text-[var(--ac)] animate-spin'
               : 'text-[var(--mu)] hover:text-[var(--tx)]'
           }`}
           aria-label="Improve my prompt"
+          title="Improve my prompt with AI"
         >
           <Sparkles className="w-4.5 h-4.5" />
         </button>
 
-        {/* Submit or Stop Button */}
+        {/* Send / Stop Button */}
         <button
           type="submit"
           disabled={!isBusy && !text.trim()}
-          className={`w-9 h-9 rounded-full flex items-center justify-center transition-transform active:scale-95 disabled:opacity-40 disabled:pointer-events-none ${
+          className={`w-9 h-9 rounded-full flex items-center justify-center transition-all shrink-0 active:scale-90 disabled:opacity-30 disabled:pointer-events-none ${
             isBusy
-              ? 'bg-[var(--rd)] text-white'
-              : 'bg-[var(--ac)] text-[var(--fg)] shadow-sm'
+              ? 'bg-[var(--rd)] text-white shadow-md'
+              : 'bg-[var(--ac)] text-[var(--fg)] shadow-sm font-bold'
           }`}
           aria-label={isBusy ? 'Stop' : 'Send'}
+          title={isBusy ? 'Stop' : 'Send'}
         >
           {isBusy ? (
-            <Square className="w-4 h-4 fill-current" />
+            <Square className="w-3.5 h-3.5 fill-current" />
           ) : (
             <ArrowUp className="w-5 h-5 stroke-[2.5]" />
           )}
