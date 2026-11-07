@@ -1,0 +1,6 @@
+{
+  "name": "Gamura AI",
+  "description": "AI aggregator uniting Gemini, ChatGPT, Claude, DeepSeek, and open models in Chat, Compare, and Council modes with customizable personas and seamless multi-model intelligence.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
