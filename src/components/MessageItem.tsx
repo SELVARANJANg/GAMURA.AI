@@ -42,17 +42,57 @@ const MessageItemComponent: React.FC<MessageItemProps> = ({
     return parseMarkdown(message.content);
   }, [message.content]);
 
-  const handleCopyCode = (e: React.MouseEvent) => {
-    const target = (e.target as HTMLElement).closest('.copy-code-btn') as HTMLElement;
-    if (target) {
-      const code = decodeURIComponent(target.dataset.code || '');
+  const handleContainerClick = (e: React.MouseEvent) => {
+    // 1. Handle Copy Code
+    const copyTarget = (e.target as HTMLElement).closest('.copy-code-btn') as HTMLElement;
+    if (copyTarget) {
+      const code = decodeURIComponent(copyTarget.dataset.code || '');
       if (code) {
         onCopy(code);
-        const originalText = target.textContent;
-        target.textContent = 'Copied!';
+        const originalText = copyTarget.textContent;
+        copyTarget.textContent = 'Copied!';
         setTimeout(() => {
-          target.textContent = originalText;
+          copyTarget.textContent = originalText;
         }, 1500);
+      }
+      return;
+    }
+
+    // 2. Handle Preview in New URL Page
+    const previewTarget = (e.target as HTMLElement).closest('.preview-code-btn') as HTMLElement;
+    if (previewTarget) {
+      const code = decodeURIComponent(previewTarget.dataset.code || '');
+      if (code) {
+        let fullHtml = code;
+        if (!/<html[\s>]/i.test(code)) {
+          fullHtml = `<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Gamura AI • Live UI Preview</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <style>
+    body { font-family: 'Plus Jakarta Sans', -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; }
+  </style>
+</head>
+<body class="bg-slate-50 text-slate-900 min-h-screen p-4 sm:p-8">
+  ${code}
+</body>
+</html>`;
+        }
+        try {
+          const blob = new Blob([fullHtml], { type: 'text/html;charset=utf-8' });
+          const blobUrl = URL.createObjectURL(blob);
+          const newWindow = window.open(blobUrl, '_blank');
+          if (!newWindow) {
+            onCopy(fullHtml);
+            alert('Popup was blocked by your browser. The code has been copied to your clipboard!');
+          }
+        } catch (err) {
+          console.error('Error opening code preview:', err);
+        }
       }
     }
   };
@@ -61,9 +101,24 @@ const MessageItemComponent: React.FC<MessageItemProps> = ({
     return (
       <div
         style={{ contentVisibility: 'auto', containIntrinsicSize: '60px' }}
-        className="self-end max-w-[86%] py-2.5 px-4 rounded-[20px] rounded-br-[6px] bg-[var(--ac)] text-[var(--fg)] text-[15px] leading-relaxed shadow-sm break-words whitespace-pre-wrap animate-in fade-in slide-in-from-bottom-1 duration-150"
+        className="self-end max-w-[86%] py-2.5 px-4 rounded-[20px] rounded-br-[6px] bg-[var(--ac)] text-[var(--fg)] text-[15px] leading-relaxed shadow-sm break-words whitespace-pre-wrap animate-in fade-in slide-in-from-bottom-1 duration-150 flex flex-col gap-2"
       >
-        {message.content}
+        {/* Attached Images */}
+        {message.images && message.images.length > 0 && (
+          <div className="flex flex-wrap gap-2 pt-1 pb-0.5">
+            {message.images.map((imgUrl, i) => (
+              <img
+                key={i}
+                src={imgUrl}
+                alt="User attached image"
+                className="max-h-48 rounded-xl object-cover border border-white/20 shadow-md cursor-pointer hover:opacity-95 transition-opacity"
+                onClick={() => window.open(imgUrl, '_blank')}
+                title="Click to view full image in new tab"
+              />
+            ))}
+          </div>
+        )}
+        {message.content && <div>{message.content}</div>}
       </div>
     );
   }
@@ -73,7 +128,7 @@ const MessageItemComponent: React.FC<MessageItemProps> = ({
 
   return (
     <div
-      onClick={handleCopyCode}
+      onClick={handleContainerClick}
       style={{ contentVisibility: 'auto', containIntrinsicSize: isWide ? '180px' : '90px' }}
       className={`self-start ${
         isWide ? 'w-full max-w-full' : 'max-w-[88%]'
@@ -258,6 +313,7 @@ export const MessageItem = memo(MessageItemComponent, (prevProps, nextProps) => 
   if (prev.err !== next.err) return false;
   if (prev.who !== next.who) return false;
   if (prev.kind !== next.kind) return false;
+  if (prev.images !== next.images) return false;
 
   // For multi-model compare or council, check cmp items
   if (prev.cmp !== next.cmp) {

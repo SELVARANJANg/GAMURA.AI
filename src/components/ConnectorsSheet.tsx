@@ -182,7 +182,7 @@ export const ConnectorsSheet: React.FC<ConnectorsSheetProps> = ({
                     type="search"
                     value={searchQuery}
                     onChange={(e) => setSearchQuery(e.target.value)}
-                    placeholder="Search 12+ AI models (NVIDIA, Perplexity...)"
+                    placeholder="Search AI models (GAMURA, BUBUBAI, SR...)"
                     className="w-full py-1.5 px-3 pl-8 text-[13px] rounded-[10px] bg-[var(--bg3)] text-[var(--tx)] placeholder:text-[var(--mu)] outline-none focus:ring-1 focus:ring-[var(--ac)]"
                   />
                   <Search className="w-3.5 h-3.5 text-[var(--mu)] absolute left-2.5 top-1/2 -translate-y-1/2 pointer-events-none" />
@@ -300,7 +300,7 @@ export const ConnectorsSheet: React.FC<ConnectorsSheetProps> = ({
               </form>
 
               <p className="mx-5 my-3 text-[12px] text-[var(--mu)] leading-relaxed">
-                Tip: Type <code>@nvidia</code>, <code>@perplexity</code>, or <code>@claude</code> at the start of any prompt to query that AI instantly.
+                Tip: Type <code>@gamura</code>, <code>@bububai</code>, or <code>@sr</code> at the start of any prompt to query that AI instantly.
               </p>
             </div>
           ) : (

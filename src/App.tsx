@@ -22,6 +22,8 @@ import { HistoryDrawer } from './components/HistoryDrawer';
 import { ConnectorsSheet } from './components/ConnectorsSheet';
 import { PersonaModal } from './components/PersonaModal';
 import { AppleAuthModal } from './components/AppleAuthModal';
+import { AnalyticsDashboard } from './components/AnalyticsDashboard';
+import { getDailyUsage, incrementDailyUsage, recordModelUsage } from './utils/usageLimit';
 import {
   queryModel,
   improvePrompt,
@@ -46,13 +48,31 @@ function loadInitialState(): AppState {
     if (saved) {
       const parsed = JSON.parse(saved);
       if (parsed && Array.isArray(parsed.threads)) {
-        const initialConnected = Array.isArray(parsed.connected) && parsed.connected.length > 0
-          ? parsed.connected
-          : ['gemini', 'chatgpt', 'claude', 'deepseek', 'perplexity', 'nvidia'];
+        // Migrate legacy model IDs if present
+        const migratedConnected: string[] = (parsed.connected || [])
+          .map((id: string) => {
+            if (id === 'gemini') return 'gamura';
+            if (id === 'chatgpt') return 'bububai';
+            if (id === 'claude') return 'sr';
+            return id;
+          })
+          .filter((id: string) => ['gamura', 'bububai', 'sr'].includes(id) || id.startsWith('c_'));
+
+        const finalConnected = migratedConnected.length > 0
+          ? migratedConnected
+          : ['gamura', 'bububai', 'sr'];
+
+        let migratedCurrent = parsed.current;
+        if (migratedCurrent === 'gemini') migratedCurrent = 'gamura';
+        if (migratedCurrent === 'chatgpt') migratedCurrent = 'bububai';
+        if (migratedCurrent === 'claude') migratedCurrent = 'sr';
+        if (!finalConnected.includes(migratedCurrent)) {
+          migratedCurrent = finalConnected[0] || 'gamura';
+        }
 
         return {
-          connected: initialConnected,
-          current: parsed.current || 'gemini',
+          connected: finalConnected,
+          current: migratedCurrent,
           custom: parsed.custom || [],
           threads: parsed.threads || [],
           active: parsed.active || null,
@@ -69,8 +89,8 @@ function loadInitialState(): AppState {
   }
 
   return {
-    connected: ['gemini', 'chatgpt', 'claude', 'deepseek', 'perplexity', 'nvidia'],
-    current: 'gemini',
+    connected: ['gamura', 'bububai', 'sr'],
+    current: 'gamura',
     custom: [],
     threads: [],
     active: null,
@@ -98,6 +118,7 @@ export default function App() {
   const [sheetTab, setSheetTab] = useState<'c' | 's'>('c');
   const [isPersonaModalOpen, setIsPersonaModalOpen] = useState(false);
   const [isAuthModalOpen, setIsAuthModalOpen] = useState(false);
+  const [isAnalyticsOpen, setIsAnalyticsOpen] = useState(false);
   const [toastMessage, setToastMessage] = useState<string | null>(null);
 
   const abortControllerRef = useRef<AbortController | null>(null);
@@ -282,12 +303,22 @@ export default function App() {
   };
 
   // Send message with Real-Time cloud sync
-  const handleSend = async (rawText: string) => {
+  const handleSend = async (rawText: string, images?: string[]) => {
     let text = rawText.trim();
-    if (!text || isBusy) return;
+    if (!text && (!images || images.length === 0)) return;
+    if (isBusy) return;
 
     let targetMode = state.mode;
     let targetConnector = currentConnector;
+
+    // Check daily message limit (3 messages / day)
+    const usage = getDailyUsage();
+    if (usage.isExceeded) {
+      showToast(
+        `Daily limit of 3 messages reached today. Resets in ${usage.timeUntilReset} at midnight.`
+      );
+      return;
+    }
 
     // Direct @model mention support
     const mentionMatch = text.match(/^@(\w+)\s+([\s\S]+)/);
@@ -327,13 +358,20 @@ export default function App() {
       return;
     }
 
+    // Deduct 1 from daily usage and record model analytics
+    incrementDailyUsage();
+    if (targetConnector) {
+      recordModelUsage(targetConnector.name);
+    }
+
     // Prepare Thread
     let threadId = state.active;
     let thread = state.threads.find((t) => t.id === threadId);
 
     const userMessage: Message = {
       role: 'user',
-      content: text,
+      content: text || (images && images.length > 0 ? 'Sent attached image(s)' : ''),
+      images: images && images.length > 0 ? images : undefined,
     };
 
     const participatingModels = connectedConnectors.slice(
@@ -419,7 +457,7 @@ export default function App() {
     const fullMessages = [
       { role: 'system' as const, content: personaInfo.instruction },
       ...historyMsgs,
-      { role: 'user' as const, content: text },
+      { role: 'user' as const, content: text, images },
     ];
 
     try {
@@ -636,7 +674,7 @@ export default function App() {
 
       {/* Main App Container */}
       <div id="app" className="relative z-10 h-full w-full max-w-[820px] mx-auto flex flex-col">
-        {/* Top Bar with Apple Profile badge */}
+        {/* Top Bar with Apple Profile badge & Analytics */}
         <TopBar
           mode={state.mode}
           onModeChange={(mode) => setState((prev) => ({ ...prev, mode }))}
@@ -647,6 +685,7 @@ export default function App() {
             setSheetTab(tab);
             setIsSheetOpen(true);
           }}
+          onOpenAnalytics={() => setIsAnalyticsOpen(true)}
           connectedCount={connectedConnectors.length}
           currentConnector={currentConnector}
           userNickname={currentUser?.nickname}
@@ -657,6 +696,7 @@ export default function App() {
         {/* Virtualized & Memoized Chat Container */}
         <VirtualizedChat
           messages={currentThread?.msgs || []}
+          threadTitle={currentThread?.title}
           isBusy={isBusy}
           onSendSuggestion={handleSend}
           onCopy={handleCopy}
@@ -813,6 +853,14 @@ export default function App() {
         }}
         onSkip={handleSkipAuth}
         onShowToast={showToast}
+      />
+
+      {/* Model Analytics & Message Dashboard */}
+      <AnalyticsDashboard
+        isOpen={isAnalyticsOpen}
+        onClose={() => setIsAnalyticsOpen(false)}
+        activeModelName={currentConnector?.name || 'Gemini'}
+        connectedCount={connectedConnectors.length}
       />
 
       {/* Toast Notification */}

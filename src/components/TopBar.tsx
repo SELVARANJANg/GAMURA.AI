@@ -1,5 +1,5 @@
 import React from 'react';
-import { Menu, Edit3, Plus, User as UserIcon } from 'lucide-react';
+import { Menu, Edit3, Plus, User as UserIcon, BarChart3 } from 'lucide-react';
 import { Connector } from '../types';
 
 interface TopBarProps {
@@ -9,6 +9,7 @@ interface TopBarProps {
   onOpenHistory: () => void;
   onNewChat: () => void;
   onOpenSheet: (tab?: 'c' | 's') => void;
+  onOpenAnalytics?: () => void;
   connectedCount: number;
   currentConnector?: Connector;
   userNickname?: string | null;
@@ -23,6 +24,7 @@ export const TopBar: React.FC<TopBarProps> = ({
   onOpenHistory,
   onNewChat,
   onOpenSheet,
+  onOpenAnalytics,
   connectedCount,
   currentConnector,
   userNickname,
@@ -38,7 +40,7 @@ export const TopBar: React.FC<TopBarProps> = ({
   } else if (mode === 'compare') {
     caption = `Asking ${Math.min(connectedCount, 4)} AIs side by side`;
   } else {
-    caption = `${Math.min(connectedCount, 4)} AIs answer, ${currentConnector ? currentConnector.name : 'Gemini'} merges the best`;
+    caption = `${Math.min(connectedCount, 4)} AIs answer, ${currentConnector ? currentConnector.name : 'GAMURA'} merges the best`;
   }
 
   return (
@@ -103,6 +105,18 @@ export const TopBar: React.FC<TopBarProps> = ({
               {userNickname || 'Sign in'}
             </span>
           </button>
+
+          {/* Model Analytics Dashboard */}
+          {onOpenAnalytics && (
+            <button
+              onClick={onOpenAnalytics}
+              className="w-9 h-9 rounded-full bg-[var(--bg3)] flex items-center justify-center text-[var(--tx)] transition-transform active:scale-90 hover:opacity-90"
+              aria-label="Model usage analytics"
+              title="Model Usage Analytics Dashboard"
+            >
+              <BarChart3 className="w-4 h-4 text-[var(--tx)]" />
+            </button>
+          )}
 
           <button
             onClick={onNewChat}

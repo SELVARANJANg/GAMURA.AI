@@ -1,12 +1,15 @@
 import React, { useRef, useEffect, useState, useCallback, useMemo } from 'react';
 import { VariableSizeList as List, ListChildComponentProps } from 'react-window';
-import { ChevronDown } from 'lucide-react';
+import { ChevronDown, ChevronUp } from 'lucide-react';
 import { Message } from '../types';
 import { MessageItem } from './MessageItem';
 import { SuggestionCards } from './SuggestionCards';
+import { ContextSummarizerBadge } from './ContextSummarizerBadge';
+import { extractContextTopics } from '../utils/contextSummarizer';
 
 interface VirtualizedChatProps {
   messages: Message[];
+  threadTitle?: string;
   isBusy: boolean;
   onSendSuggestion: (prompt: string) => void;
   onCopy: (text: string) => void;
@@ -62,6 +65,7 @@ const VirtualizedRow = ({ index, style, data }: ListChildComponentProps<ItemData
 
 export const VirtualizedChat: React.FC<VirtualizedChatProps> = ({
   messages,
+  threadTitle,
   isBusy,
   onSendSuggestion,
   onCopy,
@@ -76,7 +80,14 @@ export const VirtualizedChat: React.FC<VirtualizedChatProps> = ({
     height: 0,
   });
   const [showScrollBottom, setShowScrollBottom] = useState(false);
+  const [showScrollTop, setShowScrollTop] = useState(false);
   const isAtBottomRef = useRef(true);
+
+  // Extract key topics for thread context summarizer badge
+  const topics = useMemo(
+    () => extractContextTopics(messages, threadTitle),
+    [messages, threadTitle]
+  );
 
   // Measure container dimensions dynamically
   useEffect(() => {
@@ -148,7 +159,10 @@ export const VirtualizedChat: React.FC<VirtualizedChatProps> = ({
       const distanceFromBottom = estimatedTotalHeight - (scrollOffset + dimensions.height);
 
       isAtBottomRef.current = distanceFromBottom < 120;
+      // Show Jump to Bottom if scrolled away from bottom
       setShowScrollBottom(distanceFromBottom > 280);
+      // Show Back to Top if scrolled significantly down into the list
+      setShowScrollTop(scrollOffset > 320);
     },
     [messages, getItemSize, dimensions.height]
   );
@@ -158,6 +172,13 @@ export const VirtualizedChat: React.FC<VirtualizedChatProps> = ({
       isAtBottomRef.current = true;
       listRef.current.scrollToItem(messages.length - 1, 'end');
       setShowScrollBottom(false);
+    }
+  }, [messages.length]);
+
+  const scrollToTop = useCallback(() => {
+    if (listRef.current && messages.length > 0) {
+      listRef.current.scrollToItem(0, 'start');
+      setShowScrollTop(false);
     }
   }, [messages.length]);
 
@@ -194,6 +215,13 @@ export const VirtualizedChat: React.FC<VirtualizedChatProps> = ({
       aria-live="polite"
       role="log"
     >
+      {/* Non-intrusive Context Summarizer Badge atop chat */}
+      {topics.length > 0 && (
+        <div className="absolute top-2 left-0 right-0 z-20 flex justify-center pointer-events-auto">
+          <ContextSummarizerBadge topics={topics} />
+        </div>
+      )}
+
       {dimensions.height > 0 && dimensions.width > 0 && (
         <List
           ref={listRef}
@@ -210,17 +238,32 @@ export const VirtualizedChat: React.FC<VirtualizedChatProps> = ({
         </List>
       )}
 
-      {/* Floating Jump to Bottom Button */}
-      {showScrollBottom && (
-        <button
-          onClick={scrollToBottom}
-          className="fixed bottom-[calc(90px+env(safe-area-inset-bottom,0px))] right-5 z-20 w-9 h-9 rounded-full bg-[var(--bg3)] text-[var(--tx)] border border-[var(--ln)] shadow-lg flex items-center justify-center hover:bg-[var(--ac)] hover:text-[var(--fg)] active:scale-90 transition-all cursor-pointer"
-          aria-label="Scroll to newest message"
-          title="Jump to bottom"
-        >
-          <ChevronDown className="w-5 h-5 stroke-[2.5]" />
-        </button>
-      )}
+      {/* Floating Action Buttons: Back to Top & Jump to Bottom */}
+      <div className="fixed bottom-[calc(90px+env(safe-area-inset-bottom,0px))] right-4 z-20 flex flex-col gap-2">
+        {/* Floating Back to Top Button */}
+        {showScrollTop && (
+          <button
+            onClick={scrollToTop}
+            className="w-9 h-9 rounded-full bg-[var(--bg3)] text-[var(--tx)] border border-[var(--ln)] shadow-lg flex items-center justify-center hover:bg-[var(--ac)] hover:text-[var(--fg)] active:scale-90 transition-all cursor-pointer backdrop-blur-md"
+            aria-label="Scroll back to top"
+            title="Back to Top"
+          >
+            <ChevronUp className="w-5 h-5 stroke-[2.5]" />
+          </button>
+        )}
+
+        {/* Floating Jump to Bottom Button */}
+        {showScrollBottom && (
+          <button
+            onClick={scrollToBottom}
+            className="w-9 h-9 rounded-full bg-[var(--bg3)] text-[var(--tx)] border border-[var(--ln)] shadow-lg flex items-center justify-center hover:bg-[var(--ac)] hover:text-[var(--fg)] active:scale-90 transition-all cursor-pointer backdrop-blur-md"
+            aria-label="Scroll to newest message"
+            title="Jump to bottom"
+          >
+            <ChevronDown className="w-5 h-5 stroke-[2.5]" />
+          </button>
+        )}
+      </div>
     </div>
   );
 };

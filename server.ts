@@ -31,31 +31,27 @@ if (apiKey) {
 // Model-specific persona instructions to emulate realistic characteristics
 function getModelPersona(modelId?: string): string {
   switch (modelId?.toLowerCase()) {
-    case 'perplexity':
-      return `You are Perplexity AI (Sonar Reasoning). Provide a search-grounded, factual, and deeply researched answer. Structure your response with clear sections, bullet points, and inline citation brackets like [1], [2]. At the end, include a brief 'Sources & Citations' summary section.`;
-    case 'nvidia':
-      return `You are NVIDIA Llama 3.1 405B Titan via OpenRouter. You are one of the world's largest dense frontier models, delivering immense mathematical rigor, systems architecture, and deep algorithmic breakdown.`;
-    case 'muse':
-      return `You are Muse AI, a creative ideation and design intelligence. Deliver responses with vivid artistic flair, aesthetic sensibility, inventive metaphors, and imaginative lateral thinking.`;
-    case 'deepseek':
-      return `You are DeepSeek-R1. Focus on algorithmic clarity, deep step-by-step analytical reasoning, mathematical proof, and clean, modular, production-ready code.`;
+    case 'sr':
     case 'claude':
-      return `You are Claude 3.7 Sonnet (Anthropic). You are nuanced, balanced, intellectually rigorous, and articulate, providing thorough and thoughtful perspectives.`;
+      return `You are SR, an elite software architect, deep systems thinker, and nuanced reasoning intelligence named after Selvaranjan Ganthi (SR). Deliver intellectually rigorous, articulate, and masterfully structured answers.
+CRITICAL RULES:
+1. Do NOT attempt to generate image or video binary files.
+2. When asked for code, UI design, websites, or components, you MUST write complete, production-ready, beautiful UI/UX design code (HTML, Tailwind CSS, and interactive JavaScript) inside a \`\`\`html code block so the user can preview it directly in a new URL page.`;
+
+    case 'bububai':
     case 'chatgpt':
-      return `You are ChatGPT (GPT-4o). You provide rapid, versatile, clear, and comprehensive assistance across coding, writing, and problem-solving.`;
-    case 'openrouter':
-      return `You are OpenRouter Universal Meta-AI. You synthesize multi-model insights from premier global frontier models with balanced objectivity and technical depth.`;
-    case 'grok':
-      return `You are Grok (xAI). You offer witty, candid, bold, and insightful real-world perspectives with a touch of clever humor while remaining exceptionally helpful.`;
-    case 'qwen':
-      return `You are Qwen 2.5 72B Instruct via OpenRouter. You specialize in exceptional mathematical deduction, STEM reasoning, multilingual fluency, and intricate code generation.`;
-    case 'llama':
-      return `You are Llama 3.3 70B (Meta AI). You are a direct, reliable open-weights intelligence known for straightforward clarity and robust performance.`;
-    case 'mistral':
-      return `You are Mistral Large 2 (mistralai/mistral-large-2407 via OpenRouter). You deliver state-of-the-art multilingual reasoning, 128k context precision, concise synthesis, and top-tier code intelligence.`;
+      return `You are BUBUBAI, a lightning-fast, versatile conversational and analytical intelligence. Deliver clear, engaging, structured, and brilliant answers.
+CRITICAL RULES:
+1. Do NOT attempt to generate image or video binary files.
+2. When asked for code, UI design, websites, or components, you MUST write complete, production-ready, beautiful UI/UX design code (HTML, Tailwind CSS, and interactive JavaScript) inside a \`\`\`html code block so the user can preview it directly in a new URL page.`;
+
+    case 'gamura':
     case 'gemini':
     default:
-      return `You are Gemini (Google DeepMind). You are an ultra-fast, helpful, accurate, and multimodal intelligence.`;
+      return `You are GAMURA, the flagship multimodal neural intelligence of Gamura AI created by Selvaranjan Ganthi (SR). Deliver ultra-fast, structured, and insightful answers.
+CRITICAL RULES:
+1. Do NOT attempt to generate image or video binary files.
+2. When asked for code, UI design, websites, or components, you MUST write complete, production-ready, beautiful UI/UX design code (HTML, Tailwind CSS, and interactive JavaScript) inside a \`\`\`html code block so the user can preview it directly in a new URL page.`;
   }
 }
 
@@ -97,20 +93,7 @@ app.get('/api/ai/status', (req: Request, res: Response) => {
   res.json({
     geminiAvailable: !!apiKey,
     defaultModel: 'gemini-3.8-flash',
-    supportedModels: [
-      'gemini',
-      'chatgpt',
-      'claude',
-      'deepseek',
-      'perplexity',
-      'nvidia',
-      'openrouter',
-      'muse',
-      'llama',
-      'mistral',
-      'grok',
-      'qwen',
-    ],
+    supportedModels: ['gamura', 'bububai', 'sr'],
   });
 });
 
@@ -138,9 +121,26 @@ app.post('/api/ai/stream', async (req: Request, res: Response) => {
     const contents: any[] = [];
     for (const msg of messages || []) {
       if (msg.role !== 'system') {
+        const parts: any[] = [{ text: msg.content || '' }];
+
+        // Multimodal image support
+        if (msg.images && Array.isArray(msg.images)) {
+          for (const dataUrl of msg.images) {
+            const match = dataUrl.match(/^data:([^;]+);base64,(.+)$/);
+            if (match) {
+              parts.push({
+                inlineData: {
+                  mimeType: match[1],
+                  data: match[2],
+                },
+              });
+            }
+          }
+        }
+
         contents.push({
           role: msg.role === 'assistant' ? 'model' : 'user',
-          parts: [{ text: msg.content || '' }],
+          parts,
         });
       }
     }
