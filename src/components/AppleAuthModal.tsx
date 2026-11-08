@@ -154,20 +154,29 @@ export const AppleAuthModal: React.FC<AppleAuthModalProps> = ({
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-3.5 sm:p-4 overflow-y-auto">
-      {/* Blurred Backdrop */}
+    <div className="fixed inset-0 z-50 flex flex-col justify-end sm:justify-center items-center overflow-hidden">
+      {/* Full-screen Glassmorphism Backdrop with deep blur */}
       <div
-        className="fixed inset-0 bg-black/60 backdrop-blur-md transition-opacity"
+        className="fixed inset-0 bg-black/70 backdrop-blur-2xl transition-opacity duration-300 ease-out"
         onClick={onClose}
+        aria-hidden="true"
       />
 
-      {/* Apple Luxury Glassmorphism Card */}
-      <div className="relative w-full max-w-[420px] glass rounded-[32px] border border-white/20 dark:border-white/10 shadow-[0_30px_70px_-15px_rgba(0,0,0,0.65),inset_0_1px_1px_rgba(255,255,255,0.2)] overflow-hidden z-10 animate-in fade-in zoom-in-95 duration-250 select-none my-auto">
+      {/* Bottom-up Sliding Glassmorphism Panel with Rounded Top Corners */}
+      <div
+        className="relative w-full max-w-[490px] max-h-[92dvh] overflow-y-auto rounded-t-[40px] sm:rounded-[38px] bg-[#1c1c1e]/90 [data-t=light]:bg-white/90 backdrop-blur-3xl border-t sm:border border-white/20 dark:border-white/15 shadow-[0_-30px_80px_rgba(0,0,0,0.75),inset_0_1px_2px_rgba(255,255,255,0.3)] flex flex-col z-10 animate-in slide-in-from-bottom duration-350 ease-[cubic-bezier(0.16,1,0.3,1)] pb-[max(1.5rem,env(safe-area-inset-bottom,1.5rem))] select-none"
+        role="dialog"
+        aria-modal="true"
+        aria-label="Gamura AI Authentication"
+      >
+        {/* Apple Style Top Grab / Slide Bar */}
+        <div className="w-12 h-1.5 rounded-full bg-white/30 dark:bg-white/25 [data-t=light]:bg-black/20 mx-auto mt-3 mb-1 shrink-0" />
+
         {/* Subtle chromatic ambient top glow */}
-        <div className="h-1.5 w-full bg-gradient-to-r from-[var(--ac)] via-[#0a84ff] to-[#bf5af2] opacity-80" />
+        <div className="h-1 w-full bg-gradient-to-r from-[var(--ac)] via-[#0a84ff] to-[#bf5af2] opacity-80 shrink-0" />
 
         {/* Top Controls */}
-        <div className="flex items-center justify-between p-4 pb-0">
+        <div className="flex items-center justify-between px-5 pt-3 pb-0 shrink-0">
           <div className="flex items-center gap-2">
             <span className="w-2.5 h-2.5 rounded-full bg-[var(--ac)] shadow-[0_0_8px_var(--ac)] animate-pulse" />
             <span className="text-[11.5px] font-bold text-[var(--mu)] tracking-wider uppercase">
@@ -177,28 +186,42 @@ export const AppleAuthModal: React.FC<AppleAuthModalProps> = ({
 
           <button
             onClick={onClose}
-            className="w-8 h-8 rounded-full bg-[var(--bg3)]/60 hover:bg-[var(--bg3)] flex items-center justify-center text-[var(--mu)] hover:text-[var(--tx)] transition-all active:scale-90"
+            className="w-8 h-8 rounded-full bg-[var(--bg3)]/70 hover:bg-[var(--bg3)] flex items-center justify-center text-[var(--mu)] hover:text-[var(--tx)] transition-all active:scale-90"
             aria-label="Close"
           >
             <X className="w-4 h-4" />
           </button>
         </div>
 
-        {/* Header Content */}
-        <div className="px-6 pt-3 pb-3 text-center">
-          <div className="relative w-15 h-15 mx-auto rounded-[20px] bg-gradient-to-tr from-[var(--ac)]/25 via-[#0a84ff]/20 to-[#bf5af2]/20 border border-white/20 flex items-center justify-center shadow-lg mb-3">
-            <ShieldCheck className="w-8 h-8 text-[var(--ac)] drop-shadow-[0_0_10px_var(--ac)]" />
+        {/* Header Content with Rare Apple-Style Round Dragon Emblem */}
+        <div className="px-5 sm:px-6 pt-2 pb-2 text-center shrink-0">
+          {/* Round Shape Logo with Ambient Glow */}
+          <div className="relative w-22 h-22 mx-auto mb-3 flex items-center justify-center">
+            {/* Chromatic ambient aura */}
+            <div className="absolute inset-0 rounded-full bg-gradient-to-tr from-[var(--ac)] via-[#0a84ff] to-[#bf5af2] blur-xl opacity-60 animate-pulse pointer-events-none" />
+
+            {/* Specular glass circular bezel */}
+            <div className="relative w-22 h-22 rounded-full p-[3px] bg-gradient-to-b from-white/50 via-white/20 to-white/5 shadow-[0_12px_32px_rgba(0,0,0,0.5)] flex items-center justify-center backdrop-blur-md">
+              {/* Inner Round Badge with Dragon Emblem */}
+              <div className="w-full h-full rounded-full bg-white dark:bg-[#121215] flex items-center justify-center overflow-hidden shadow-inner p-1">
+                <img
+                  src="/assets/gamura-logo.png"
+                  alt="Gamura AI Logo"
+                  className="w-full h-full rounded-full object-cover object-center drop-shadow-sm transition-transform duration-300 hover:scale-110"
+                />
+              </div>
+            </div>
           </div>
 
-          <h2 className="text-[24px] font-extrabold tracking-tight text-[var(--tx)]">
+          <h2 className="text-[23px] sm:text-[25px] font-extrabold tracking-tight text-[var(--tx)]">
             {isSignUp ? 'Create Gamura Account' : 'Sign in to Gamura AI'}
           </h2>
-          <p className="text-[13px] text-[var(--mu)] mt-1 leading-relaxed">
-            Real-time synchronization across all your devices and models.
+          <p className="text-[12.5px] sm:text-[13px] text-[var(--mu)] mt-0.5 leading-relaxed max-w-[320px] mx-auto">
+            Real-time synchronization across all your frontier AI models.
           </p>
 
           {/* Cupertino Segmented Switcher */}
-          <div className="flex bg-[var(--bg3)]/70 backdrop-blur-md rounded-[14px] p-[3px] mt-4 max-w-[290px] mx-auto border border-white/10 shadow-inner">
+          <div className="flex bg-[var(--bg3)]/80 backdrop-blur-md rounded-[14px] p-[3px] mt-3.5 max-w-[280px] mx-auto border border-white/10 shadow-inner">
             <button
               type="button"
               onClick={() => setIsSignUp(false)}
@@ -225,13 +248,13 @@ export const AppleAuthModal: React.FC<AppleAuthModalProps> = ({
         </div>
 
         {/* Form Inputs with Fluid Glassmorphism */}
-        <form onSubmit={handleSubmit} className="px-6 space-y-3.5 pb-3">
+        <form onSubmit={handleSubmit} className="px-5 sm:px-6 space-y-3 pt-1 pb-2">
           {/* Username / Email */}
-          <div className="space-y-1.5 text-left">
+          <div className="space-y-1 text-left">
             <label className="text-[12px] font-semibold text-[var(--mu)] ml-1">
               Username or Email
             </label>
-            <div className="relative flex items-center rounded-[16px] bg-[var(--bg3)]/50 backdrop-blur-md border border-white/10 transition-all focus-within:border-[var(--ac)] focus-within:ring-2 focus-within:ring-[var(--ac)]/25 focus-within:bg-[var(--bg3)]/80">
+            <div className="relative flex items-center rounded-[16px] bg-[var(--bg3)]/60 backdrop-blur-md border border-white/10 transition-all focus-within:border-[var(--ac)] focus-within:ring-2 focus-within:ring-[var(--ac)]/25 focus-within:bg-[var(--bg3)]/80">
               <input
                 type="text"
                 value={username}
@@ -246,11 +269,11 @@ export const AppleAuthModal: React.FC<AppleAuthModalProps> = ({
 
           {/* Nickname (Sign Up Only) */}
           {isSignUp && (
-            <div className="space-y-1.5 text-left animate-in fade-in slide-in-from-top-1 duration-200">
+            <div className="space-y-1 text-left animate-in fade-in slide-in-from-top-1 duration-200">
               <label className="text-[12px] font-semibold text-[var(--mu)] ml-1">
                 Nickname / Display Name
               </label>
-              <div className="relative flex items-center rounded-[16px] bg-[var(--bg3)]/50 backdrop-blur-md border border-white/10 transition-all focus-within:border-[var(--ac)] focus-within:ring-2 focus-within:ring-[var(--ac)]/25 focus-within:bg-[var(--bg3)]/80">
+              <div className="relative flex items-center rounded-[16px] bg-[var(--bg3)]/60 backdrop-blur-md border border-white/10 transition-all focus-within:border-[var(--ac)] focus-within:ring-2 focus-within:ring-[var(--ac)]/25 focus-within:bg-[var(--bg3)]/80">
                 <input
                   type="text"
                   value={nickname}
@@ -264,14 +287,14 @@ export const AppleAuthModal: React.FC<AppleAuthModalProps> = ({
           )}
 
           {/* Password */}
-          <div className="space-y-1.5 text-left">
+          <div className="space-y-1 text-left">
             <div className="flex items-center justify-between ml-1">
               <label className="text-[12px] font-semibold text-[var(--mu)]">
                 Password
               </label>
               <span className="text-[11px] text-[var(--mu)]">min 6 chars</span>
             </div>
-            <div className="relative flex items-center rounded-[16px] bg-[var(--bg3)]/50 backdrop-blur-md border border-white/10 transition-all focus-within:border-[var(--ac)] focus-within:ring-2 focus-within:ring-[var(--ac)]/25 focus-within:bg-[var(--bg3)]/80">
+            <div className="relative flex items-center rounded-[16px] bg-[var(--bg3)]/60 backdrop-blur-md border border-white/10 transition-all focus-within:border-[var(--ac)] focus-within:ring-2 focus-within:ring-[var(--ac)]/25 focus-within:bg-[var(--bg3)]/80">
               <input
                 type={showPassword ? 'text' : 'password'}
                 value={password}
@@ -313,11 +336,11 @@ export const AppleAuthModal: React.FC<AppleAuthModalProps> = ({
           </div>
 
           {/* Primary Submit Button */}
-          <div className="pt-2">
+          <div className="pt-1.5">
             <button
               type="submit"
               disabled={loading}
-              className="w-full py-3.5 rounded-[18px] bg-[var(--ac)] text-[var(--fg)] font-bold text-[15px] flex items-center justify-center gap-2 shadow-[0_8px_20px_rgba(25,208,127,0.3)] transition-transform active:scale-[0.98] hover:opacity-95 disabled:opacity-50"
+              className="w-full py-3.5 rounded-[18px] bg-[var(--ac)] text-[var(--fg)] font-bold text-[15px] flex items-center justify-center gap-2 shadow-[0_8px_20px_rgba(25,208,127,0.3)] transition-transform active:scale-[0.98] hover:opacity-95 disabled:opacity-50 cursor-pointer"
             >
               {loading ? (
                 <span className="dots"><b /><b /><b /></span>
@@ -332,22 +355,22 @@ export const AppleAuthModal: React.FC<AppleAuthModalProps> = ({
         </form>
 
         {/* Divider */}
-        <div className="relative px-6 py-1">
+        <div className="relative px-6 py-0.5">
           <div className="absolute inset-0 flex items-center px-6">
             <div className="w-full border-t border-white/10" />
           </div>
-          <div className="relative flex justify-center text-[11px] uppercase tracking-wider text-[var(--mu)]">
+          <div className="relative flex justify-center text-[10.5px] uppercase tracking-wider text-[var(--mu)]">
             <span className="bg-[var(--bg2)] px-2.5 rounded-full">or continue with</span>
           </div>
         </div>
 
         {/* Google Sign In Button & Domain Guidance */}
-        <div className="px-6 pt-2 pb-3 space-y-2.5">
+        <div className="px-5 sm:px-6 pt-1.5 pb-2 space-y-2">
           <button
             type="button"
             onClick={handleGoogleSignIn}
             disabled={loading}
-            className="w-full py-3 px-4 rounded-[18px] bg-[var(--bg3)]/60 hover:bg-[var(--bg3)] text-[var(--tx)] font-semibold text-[14px] flex items-center justify-center gap-2.5 border border-white/10 shadow-sm transition-all active:scale-[0.98]"
+            className="w-full py-3 px-4 rounded-[18px] bg-[var(--bg3)]/60 hover:bg-[var(--bg3)] text-[var(--tx)] font-semibold text-[14px] flex items-center justify-center gap-2.5 border border-white/10 shadow-sm transition-all active:scale-[0.98] cursor-pointer"
           >
             {/* Google SVG */}
             <svg className="w-4 h-4 shrink-0" viewBox="0 0 24 24">
@@ -426,20 +449,20 @@ export const AppleAuthModal: React.FC<AppleAuthModalProps> = ({
           )}
         </div>
 
-        {/* Skip Button (Apple Style Guest Access) */}
-        <div className="px-6 pb-4 text-center">
+        {/* Skip Button - Apple Style Guest Access, Centered & Highly Responsive Across All Mobile Viewports */}
+        <div className="px-5 sm:px-6 pt-1 pb-3 flex justify-center w-full">
           <button
             type="button"
             onClick={onSkip}
-            className="text-[13px] font-semibold text-[var(--mu)] hover:text-[var(--ac)] transition-colors py-1.5 px-4 rounded-full hover:bg-[var(--bg3)]/50 active:scale-95 flex items-center justify-center gap-1.5 mx-auto"
+            className="w-full max-w-[340px] py-3 px-5 rounded-full bg-[var(--bg3)]/70 hover:bg-[var(--bg3)] border border-white/10 dark:border-white/10 [data-t=light]:border-black/10 text-[13.5px] font-semibold text-[var(--mu)] hover:text-[var(--tx)] active:scale-95 transition-all flex items-center justify-center gap-2 mx-auto shadow-sm cursor-pointer"
           >
-            <Zap className="w-3.5 h-3.5" />
-            <span>Skip for now • Continue as Guest</span>
+            <Zap className="w-4 h-4 text-[var(--ac)] shrink-0" />
+            <span className="font-semibold tracking-wide">Skip for now • Continue as Guest</span>
           </button>
         </div>
 
         {/* Security Footer Note */}
-        <div className="bg-[var(--bg3)]/30 border-t border-white/10 py-2.5 px-6 text-center">
+        <div className="bg-[var(--bg3)]/30 border-t border-white/10 py-2 px-6 text-center shrink-0">
           <p className="text-[11px] text-[var(--mu)] flex items-center justify-center gap-1">
             <Lock className="w-3 h-3 text-[var(--ac)] inline" />
             <span>Secured with Firebase Auth & Real-Time Sync</span>

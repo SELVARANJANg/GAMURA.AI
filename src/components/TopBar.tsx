@@ -55,9 +55,23 @@ export const TopBar: React.FC<TopBarProps> = ({
           </button>
         </div>
 
-        {/* Center Title */}
-        <div className="flex items-center gap-2 font-bold text-[17px] tracking-[-0.2px] select-none">
-          <span className={`orb ${isBusy ? 'busy' : ''}`} />
+        {/* Center Title with official Dragon Logo */}
+        <div
+          onClick={onNewChat}
+          className="flex items-center gap-2 font-bold text-[17px] tracking-[-0.2px] select-none cursor-pointer group"
+          title="Gamura AI • New Chat"
+        >
+          <div className="relative w-7 h-7 flex items-center justify-center shrink-0">
+            <div className="w-7 h-7 rounded-full p-[1.5px] bg-gradient-to-tr from-[var(--ac)] via-[#0a84ff] to-[#bf5af2] shadow-[0_0_8px_var(--ac)] flex items-center justify-center">
+              <img
+                src="/assets/gamura-logo.png"
+                alt="Gamura AI"
+                className={`w-full h-full rounded-full object-cover object-center bg-white shadow-inner transition-transform duration-300 ${
+                  isBusy ? 'animate-spin scale-110' : 'group-hover:scale-110'
+                }`}
+              />
+            </div>
+          </div>
           <span className="text-[var(--tx)]">Gamura AI</span>
         </div>
 

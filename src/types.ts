@@ -83,36 +83,54 @@ export const DEFAULT_CONNECTORS: Connector[] = [
   },
   {
     id: "deepseek",
-    name: "DeepSeek",
+    name: "DeepSeek R1",
     by: "DeepSeek",
-    model: "deepseek-chat",
+    model: "deepseek/deepseek-r1",
     color: "#3b82f6",
-    desc: "Advanced logic, math & algorithmic reasoning.",
+    desc: "Deep chain-of-thought logic, math & algorithmic reasoning.",
     badge: "Coding"
   },
   {
     id: "perplexity",
     name: "Perplexity",
-    by: "Perplexity AI",
-    model: "sonar-reasoning",
+    by: "OpenRouter",
+    model: "perplexity/sonar-reasoning",
     color: "#20b2aa",
-    desc: "Real-time search grounding and cited answers.",
+    desc: "Real-time web search grounding and cited live answers.",
     badge: "Search"
   },
   {
     id: "nvidia",
-    name: "NVIDIA",
-    by: "NVIDIA NIM",
-    model: "llama-3.1-nemotron-70b-instruct",
+    name: "NVIDIA Llama 3.1 405B",
+    by: "NVIDIA / OpenRouter",
+    model: "meta-llama/llama-3.1-405b-instruct",
     color: "#76b900",
-    desc: "High-precision enterprise reasoning & instructions.",
-    badge: "Enterprise"
+    desc: "Titan 405B parameters for enterprise deep reasoning.",
+    badge: "405B Titan"
+  },
+  {
+    id: "mistral",
+    name: "Mistral Large 2",
+    by: "Mistral AI / OpenRouter",
+    model: "mistralai/mistral-large-2407",
+    color: "#f59e0b",
+    desc: "Flagship 128k context multilingual & code champion.",
+    badge: "Large 2"
+  },
+  {
+    id: "qwen",
+    name: "Qwen 2.5 72B",
+    by: "Alibaba / OpenRouter",
+    model: "qwen/qwen-2.5-72b-instruct",
+    color: "#0284c7",
+    desc: "Premier multilingual math & complex STEM reasoning.",
+    badge: "STEM 72B"
   },
   {
     id: "openrouter",
     name: "OpenRouter",
     by: "OpenRouter",
-    model: "auto-router-best",
+    model: "openrouter/auto",
     color: "#9333ea",
     desc: "Multi-provider routing & open meta-intelligence.",
     badge: "Universal"
@@ -128,39 +146,21 @@ export const DEFAULT_CONNECTORS: Connector[] = [
   },
   {
     id: "llama",
-    name: "Llama",
-    by: "Meta",
-    model: "openrouter:meta-llama/llama-3.3-70b-instruct",
+    name: "Llama 3.3 70B",
+    by: "Meta AI",
+    model: "meta-llama/llama-3.3-70b-instruct",
     color: "#8b5cf6",
     desc: "Meta's flagship open-weights champion.",
     badge: "Open"
   },
   {
-    id: "mistral",
-    name: "Mistral",
-    by: "Mistral AI",
-    model: "mistral-large-latest",
-    color: "#f59e0b",
-    desc: "Compact, lightning-fast multilingual reasoning.",
-    badge: "European"
-  },
-  {
     id: "grok",
     name: "Grok",
     by: "xAI",
-    model: "grok-2",
+    model: "x-ai/grok-2-1212",
     color: "#ef4444",
     desc: "Witty, truthful, and real-time bold insights.",
     badge: "Unfiltered"
-  },
-  {
-    id: "qwen",
-    name: "Qwen",
-    by: "Alibaba",
-    model: "qwen-2.5-72b-instruct",
-    color: "#0284c7",
-    desc: "Exceptional multilingual math & STEM reasoning.",
-    badge: "Multilingual"
   }
 ];
 

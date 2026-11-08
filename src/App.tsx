@@ -17,6 +17,7 @@ import { TopBar } from './components/TopBar';
 import { SuggestionCards } from './components/SuggestionCards';
 import { DockInput } from './components/DockInput';
 import { MessageItem } from './components/MessageItem';
+import { VirtualizedChat } from './components/VirtualizedChat';
 import { HistoryDrawer } from './components/HistoryDrawer';
 import { ConnectorsSheet } from './components/ConnectorsSheet';
 import { PersonaModal } from './components/PersonaModal';
@@ -653,30 +654,15 @@ export default function App() {
           onOpenAuth={() => setIsAuthModalOpen(true)}
         />
 
-        {/* Chat Scroll Container */}
-        <div
-          id="chat"
-          ref={chatScrollRef}
-          className="flex-1 overflow-y-auto px-3.5 py-4 flex flex-col gap-3 scroll-smooth"
-          aria-live="polite"
-        >
-          {!currentThread || currentThread.msgs.length === 0 ? (
-            <SuggestionCards onSelectSuggestion={handleSend} />
-          ) : (
-            currentThread.msgs.map((msg, index) => (
-              <MessageItem
-                key={index}
-                message={msg}
-                index={index}
-                isLast={index === currentThread.msgs.length - 1}
-                isBusy={isBusy}
-                onCopy={handleCopy}
-                onSpeak={handleSpeak}
-                onRedo={handleRedo}
-              />
-            ))
-          )}
-        </div>
+        {/* Virtualized & Memoized Chat Container */}
+        <VirtualizedChat
+          messages={currentThread?.msgs || []}
+          isBusy={isBusy}
+          onSendSuggestion={handleSend}
+          onCopy={handleCopy}
+          onSpeak={handleSpeak}
+          onRedo={handleRedo}
+        />
 
         {/* Bottom Input Dock */}
         <DockInput
