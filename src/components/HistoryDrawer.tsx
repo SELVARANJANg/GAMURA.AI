@@ -146,6 +146,13 @@ export const HistoryDrawer: React.FC<HistoryDrawerProps> = ({
           )}
         </div>
 
+        {/* 24-hour Auto Refresh Note */}
+        <div className="py-2 px-1 text-center select-none">
+          <p className="text-[11px] text-[var(--mu)] leading-normal">
+            ⏳ Chats auto-refresh every 24h. Quota: 3 chats & 3 images/day per user.
+          </p>
+        </div>
+
         {/* Wide Bottom New Chat Button */}
         <button
           onClick={() => {

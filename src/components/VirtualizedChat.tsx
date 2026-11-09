@@ -4,8 +4,6 @@ import { ChevronDown, ChevronUp } from 'lucide-react';
 import { Message } from '../types';
 import { MessageItem } from './MessageItem';
 import { SuggestionCards } from './SuggestionCards';
-import { ContextSummarizerBadge } from './ContextSummarizerBadge';
-import { extractContextTopics } from '../utils/contextSummarizer';
 
 interface VirtualizedChatProps {
   messages: Message[];
@@ -15,6 +13,7 @@ interface VirtualizedChatProps {
   onCopy: (text: string) => void;
   onSpeak: (text: string) => void;
   onRedo: (index: number) => void;
+  onPreviewCode?: (code: string) => void;
 }
 
 interface ItemData {
@@ -23,6 +22,7 @@ interface ItemData {
   onCopy: (text: string) => void;
   onSpeak: (text: string) => void;
   onRedo: (index: number) => void;
+  onPreviewCode?: (code: string) => void;
   sizeMap: Map<number, number>;
   listRef: React.RefObject<List | null>;
 }
@@ -57,6 +57,7 @@ const VirtualizedRow = ({ index, style, data }: ListChildComponentProps<ItemData
           onCopy={data.onCopy}
           onSpeak={data.onSpeak}
           onRedo={data.onRedo}
+          onPreviewCode={data.onPreviewCode}
         />
       </div>
     </div>
@@ -71,6 +72,7 @@ export const VirtualizedChat: React.FC<VirtualizedChatProps> = ({
   onCopy,
   onSpeak,
   onRedo,
+  onPreviewCode,
 }) => {
   const containerRef = useRef<HTMLDivElement>(null);
   const listRef = useRef<List | null>(null);
@@ -84,10 +86,6 @@ export const VirtualizedChat: React.FC<VirtualizedChatProps> = ({
   const isAtBottomRef = useRef(true);
 
   // Extract key topics for thread context summarizer badge
-  const topics = useMemo(
-    () => extractContextTopics(messages, threadTitle),
-    [messages, threadTitle]
-  );
 
   // Measure container dimensions dynamically
   useEffect(() => {
@@ -189,10 +187,11 @@ export const VirtualizedChat: React.FC<VirtualizedChatProps> = ({
       onCopy,
       onSpeak,
       onRedo,
+      onPreviewCode,
       sizeMap: sizeMapRef.current,
       listRef,
     }),
-    [messages, isBusy, onCopy, onSpeak, onRedo]
+    [messages, isBusy, onCopy, onSpeak, onRedo, onPreviewCode]
   );
 
   if (!messages || messages.length === 0) {
@@ -215,12 +214,6 @@ export const VirtualizedChat: React.FC<VirtualizedChatProps> = ({
       aria-live="polite"
       role="log"
     >
-      {/* Non-intrusive Context Summarizer Badge atop chat */}
-      {topics.length > 0 && (
-        <div className="absolute top-2 left-0 right-0 z-20 flex justify-center pointer-events-auto">
-          <ContextSummarizerBadge topics={topics} />
-        </div>
-      )}
 
       {dimensions.height > 0 && dimensions.width > 0 && (
         <List

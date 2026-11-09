@@ -1,5 +1,5 @@
 import React from 'react';
-import { Menu, Edit3, Plus, User as UserIcon, BarChart3 } from 'lucide-react';
+import { Menu, Edit3, Plus, User as UserIcon, BarChart3, Download } from 'lucide-react';
 import { Connector } from '../types';
 
 interface TopBarProps {
@@ -15,6 +15,8 @@ interface TopBarProps {
   userNickname?: string | null;
   userPhoto?: string | null;
   onOpenAuth: () => void;
+  canInstallPWA?: boolean;
+  onInstallPWA?: () => void;
 }
 
 export const TopBar: React.FC<TopBarProps> = ({
@@ -30,6 +32,8 @@ export const TopBar: React.FC<TopBarProps> = ({
   userNickname,
   userPhoto,
   onOpenAuth,
+  canInstallPWA,
+  onInstallPWA,
 }) => {
   // Caption based on mode
   let caption = '';
@@ -105,6 +109,19 @@ export const TopBar: React.FC<TopBarProps> = ({
               {userNickname || 'Sign in'}
             </span>
           </button>
+
+          {/* PWA Install Button */}
+          {canInstallPWA && onInstallPWA && (
+            <button
+              onClick={onInstallPWA}
+              className="h-9 px-2.5 sm:px-3 rounded-full bg-[var(--ac)] text-[var(--fg)] flex items-center gap-1.5 transition-transform active:scale-90 text-[12px] font-bold shadow-sm shadow-[var(--ac)]/30 animate-pulse hover:opacity-95"
+              aria-label="Install Gamura AI App"
+              title="Install Gamura AI App on your home screen"
+            >
+              <Download className="w-4 h-4 shrink-0" />
+              <span className="hidden sm:inline">Install</span>
+            </button>
+          )}
 
           {/* Model Analytics Dashboard */}
           {onOpenAnalytics && (

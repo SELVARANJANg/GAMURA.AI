@@ -1,7 +1,12 @@
 import React, { useRef, useEffect, useState } from 'react';
 import { Mic, Sparkles, ArrowUp, Square, ChevronDown, Image as ImageIcon, X } from 'lucide-react';
 import { Connector, PERSONAS } from '../types';
-import { getDailyUsage, getDailyImageUsage, incrementDailyImageUsage } from '../utils/usageLimit';
+import {
+  getDailyUsage,
+  getDailyImageUsage,
+  incrementDailyImageUsage,
+  resetDailyUsage,
+} from '../utils/usageLimit';
 
 interface DockInputProps {
   connectedConnectors: Connector[];
@@ -11,6 +16,7 @@ interface DockInputProps {
   onOpenPersonaModal: () => void;
   mode: 'chat' | 'compare' | 'council';
   isBusy: boolean;
+  userId?: string | null;
   onSend: (text: string, images?: string[]) => void;
   onStop: () => void;
   onImprovePrompt: (currentText: string, onUpdate: (newText: string) => void) => void;
@@ -25,6 +31,7 @@ export const DockInput: React.FC<DockInputProps> = ({
   onOpenPersonaModal,
   mode,
   isBusy,
+  userId,
   onSend,
   onStop,
   onImprovePrompt,
@@ -34,6 +41,7 @@ export const DockInput: React.FC<DockInputProps> = ({
   const [attachedImages, setAttachedImages] = useState<string[]>([]);
   const [isRecording, setIsRecording] = useState(false);
   const [isImproving, setIsImproving] = useState(false);
+  const [, setQuotaTick] = useState(0);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const recognitionRef = useRef<any>(null);
@@ -62,7 +70,7 @@ export const DockInput: React.FC<DockInputProps> = ({
       return;
     }
 
-    const imageUsage = getDailyImageUsage();
+    const imageUsage = getDailyImageUsage(userId);
     if (imageUsage.isExceeded || attachedImages.length >= imageUsage.remaining) {
       onShowToast(
         `Daily image limit reached (3/3 used today). Resets in ${imageUsage.timeUntilReset} at midnight.`
@@ -98,7 +106,7 @@ export const DockInput: React.FC<DockInputProps> = ({
       if (items[i].type.startsWith('image/')) {
         const file = items[i].getAsFile();
         if (file) {
-          const imageUsage = getDailyImageUsage();
+          const imageUsage = getDailyImageUsage(userId);
           if (imageUsage.isExceeded || attachedImages.length >= imageUsage.remaining) {
             onShowToast(
               `Daily image limit reached (3/3 used today). Resets in ${imageUsage.timeUntilReset}.`
@@ -177,8 +185,8 @@ export const DockInput: React.FC<DockInputProps> = ({
     }
   };
 
-  const dailyUsage = getDailyUsage();
-  const dailyImageUsage = getDailyImageUsage();
+  const dailyUsage = getDailyUsage(userId);
+  const dailyImageUsage = getDailyImageUsage(userId);
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
@@ -197,7 +205,7 @@ export const DockInput: React.FC<DockInputProps> = ({
     }
 
     if (attachedImages.length > 0) {
-      incrementDailyImageUsage(attachedImages.length);
+      incrementDailyImageUsage(attachedImages.length, userId);
     }
 
     onSend(trimmed, attachedImages.length > 0 ? attachedImages : undefined);
@@ -255,31 +263,59 @@ export const DockInput: React.FC<DockInputProps> = ({
         id="chips"
         className="flex gap-2 overflow-x-auto px-2 py-1.5 pb-2.5 no-scrollbar scroll-smooth items-center"
       >
-        {/* Daily message limit badge */}
-        <div
-          className={`shrink-0 py-1 px-3 rounded-full text-[11.5px] font-bold flex items-center gap-1.5 border transition-all ${
+        {/* Daily message limit badge with tap-to-reset */}
+        <button
+          type="button"
+          onClick={() => {
+            if (dailyUsage.isExceeded) {
+              resetDailyUsage(userId);
+              setQuotaTick((t) => t + 1);
+              onShowToast('Quota refreshed! You have 3 fresh chats.');
+            } else {
+              onShowToast(`Daily quota: ${dailyUsage.remaining} / 3 chats remaining today.`);
+            }
+          }}
+          className={`shrink-0 py-1 px-3 rounded-full text-[11.5px] font-bold flex items-center gap-1.5 border transition-all cursor-pointer active:scale-95 ${
             dailyUsage.isExceeded
-              ? 'bg-rose-500/15 text-rose-400 border-rose-500/30'
-              : 'bg-[var(--bg3)] text-[var(--tx)] border-[var(--ln)]'
+              ? 'bg-rose-500/15 text-rose-400 border-rose-500/30 hover:bg-rose-500/25'
+              : 'bg-[var(--bg3)] text-[var(--tx)] border-[var(--ln)] hover:opacity-90'
           }`}
-          title={`Daily message limit: 3 messages per day. Resets at midnight (${dailyUsage.timeUntilReset} remaining)`}
+          title={
+            dailyUsage.isExceeded
+              ? `Daily limit reached. Tap here to reset quota for testing.`
+              : `Daily message limit: 3 messages per day. Resets in ${dailyUsage.timeUntilReset}.`
+          }
         >
           <span className={dailyUsage.isExceeded ? 'text-rose-400' : 'text-[var(--ac)]'}>⚡</span>
-          <span>{dailyUsage.remaining} / 3 chats left</span>
-        </div>
+          <span>{dailyUsage.isExceeded ? 'Limit Reached • Tap to Reset' : `${dailyUsage.remaining} / 3 chats left`}</span>
+        </button>
 
-        {/* Daily image limit badge */}
-        <div
-          className={`shrink-0 py-1 px-3 rounded-full text-[11.5px] font-bold flex items-center gap-1.5 border transition-all ${
+        {/* Daily image limit badge with tap-to-reset */}
+        <button
+          type="button"
+          onClick={() => {
+            if (dailyImageUsage.isExceeded) {
+              resetDailyUsage(userId);
+              setQuotaTick((t) => t + 1);
+              onShowToast('Image quota refreshed! You have 3 image slots.');
+            } else {
+              onShowToast(`Daily image limit: ${dailyImageUsage.remaining} / 3 images remaining today.`);
+            }
+          }}
+          className={`shrink-0 py-1 px-3 rounded-full text-[11.5px] font-bold flex items-center gap-1.5 border transition-all cursor-pointer active:scale-95 ${
             dailyImageUsage.isExceeded
-              ? 'bg-rose-500/15 text-rose-400 border-rose-500/30'
-              : 'bg-[var(--bg3)] text-[var(--tx)] border-[var(--ln)]'
+              ? 'bg-rose-500/15 text-rose-400 border-rose-500/30 hover:bg-rose-500/25'
+              : 'bg-[var(--bg3)] text-[var(--tx)] border-[var(--ln)] hover:opacity-90'
           }`}
-          title={`Daily image limit: 3 images per day. Resets at midnight (${dailyImageUsage.timeUntilReset} remaining)`}
+          title={
+            dailyImageUsage.isExceeded
+              ? `Daily image limit reached. Tap here to reset quota for testing.`
+              : `Daily image limit: 3 images per day. Resets in ${dailyImageUsage.timeUntilReset}.`
+          }
         >
           <span className={dailyImageUsage.isExceeded ? 'text-rose-400' : 'text-[#0a84ff]'}>📷</span>
-          <span>{dailyImageUsage.remaining} / 3 images left</span>
-        </div>
+          <span>{dailyImageUsage.isExceeded ? 'Limit Reached • Tap to Reset' : `${dailyImageUsage.remaining} / 3 images left`}</span>
+        </button>
 
         <div className="w-[1px] h-4 bg-[var(--ln)] shrink-0 my-auto" />
 

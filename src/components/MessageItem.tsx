@@ -11,6 +11,7 @@ interface MessageItemProps {
   onCopy: (text: string) => void;
   onSpeak: (text: string) => void;
   onRedo: (index: number) => void;
+  onPreviewCode?: (code: string) => void;
 }
 
 const MessageItemComponent: React.FC<MessageItemProps> = ({
@@ -21,6 +22,7 @@ const MessageItemComponent: React.FC<MessageItemProps> = ({
   onCopy,
   onSpeak,
   onRedo,
+  onPreviewCode,
 }) => {
   const isUser = message.role === 'user';
 
@@ -58,11 +60,17 @@ const MessageItemComponent: React.FC<MessageItemProps> = ({
       return;
     }
 
-    // 2. Handle Preview in New URL Page
+    // 2. Handle In-Chat Isolated Iframe Modal Preview
     const previewTarget = (e.target as HTMLElement).closest('.preview-code-btn') as HTMLElement;
     if (previewTarget) {
       const code = decodeURIComponent(previewTarget.dataset.code || '');
       if (code) {
+        if (onPreviewCode) {
+          onPreviewCode(code);
+          return;
+        }
+
+        // Fallback if modal handler not passed
         let fullHtml = code;
         if (!/<html[\s>]/i.test(code)) {
           fullHtml = `<!DOCTYPE html>
@@ -85,11 +93,7 @@ const MessageItemComponent: React.FC<MessageItemProps> = ({
         try {
           const blob = new Blob([fullHtml], { type: 'text/html;charset=utf-8' });
           const blobUrl = URL.createObjectURL(blob);
-          const newWindow = window.open(blobUrl, '_blank');
-          if (!newWindow) {
-            onCopy(fullHtml);
-            alert('Popup was blocked by your browser. The code has been copied to your clipboard!');
-          }
+          window.open(blobUrl, '_blank');
         } catch (err) {
           console.error('Error opening code preview:', err);
         }

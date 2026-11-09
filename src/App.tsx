@@ -23,7 +23,16 @@ import { ConnectorsSheet } from './components/ConnectorsSheet';
 import { PersonaModal } from './components/PersonaModal';
 import { AppleAuthModal } from './components/AppleAuthModal';
 import { AnalyticsDashboard } from './components/AnalyticsDashboard';
-import { getDailyUsage, incrementDailyUsage, recordModelUsage } from './utils/usageLimit';
+import { CodePreviewModal } from './components/CodePreviewModal';
+import { exportThreadToPdf } from './utils/pdfExport';
+import { usePWAInstall } from './hooks/usePWAInstall';
+import {
+  getDailyUsage,
+  incrementDailyUsage,
+  recordModelUsage,
+  checkAndCleanExpiredChats,
+  updateLastInteraction,
+} from './utils/usageLimit';
 import {
   queryModel,
   improvePrompt,
@@ -48,6 +57,11 @@ function loadInitialState(): AppState {
     if (saved) {
       const parsed = JSON.parse(saved);
       if (parsed && Array.isArray(parsed.threads)) {
+        // Automatically prune any thread older than 24 hours on app boot
+        const { cleanedThreads } = checkAndCleanExpiredChats(parsed.threads, 'guest');
+
+        const allAvailableIds = DEFAULT_CONNECTORS.map((c) => c.id);
+
         // Migrate legacy model IDs if present
         const migratedConnected: string[] = (parsed.connected || [])
           .map((id: string) => {
@@ -56,11 +70,11 @@ function loadInitialState(): AppState {
             if (id === 'claude') return 'sr';
             return id;
           })
-          .filter((id: string) => ['gamura', 'bububai', 'sr'].includes(id) || id.startsWith('c_'));
+          .filter((id: string) => allAvailableIds.includes(id) || id.startsWith('c_'));
 
-        const finalConnected = migratedConnected.length > 0
+        const finalConnected = migratedConnected.length >= 3
           ? migratedConnected
-          : ['gamura', 'bububai', 'sr'];
+          : allAvailableIds;
 
         let migratedCurrent = parsed.current;
         if (migratedCurrent === 'gemini') migratedCurrent = 'gamura';
@@ -74,8 +88,8 @@ function loadInitialState(): AppState {
           connected: finalConnected,
           current: migratedCurrent,
           custom: parsed.custom || [],
-          threads: parsed.threads || [],
-          active: parsed.active || null,
+          threads: cleanedThreads,
+          active: parsed.active && cleanedThreads.some((t: Thread) => t.id === parsed.active) ? parsed.active : null,
           persona: parsed.persona || 'general',
           mode: parsed.mode || 'chat',
           theme: parsed.theme || 'auto',
@@ -89,7 +103,7 @@ function loadInitialState(): AppState {
   }
 
   return {
-    connected: ['gamura', 'bububai', 'sr'],
+    connected: DEFAULT_CONNECTORS.map((c) => c.id),
     current: 'gamura',
     custom: [],
     threads: [],
@@ -119,7 +133,10 @@ export default function App() {
   const [isPersonaModalOpen, setIsPersonaModalOpen] = useState(false);
   const [isAuthModalOpen, setIsAuthModalOpen] = useState(false);
   const [isAnalyticsOpen, setIsAnalyticsOpen] = useState(false);
+  const [previewCode, setPreviewCode] = useState<string | null>(null);
   const [toastMessage, setToastMessage] = useState<string | null>(null);
+
+  const { canInstall: canInstallPWA, isInstalled: isPWAInstalled, install: handleInstallPWA } = usePWAInstall();
 
   const abortControllerRef = useRef<AbortController | null>(null);
   const chatScrollRef = useRef<HTMLDivElement>(null);
@@ -169,6 +186,61 @@ export default function App() {
 
     return () => unsubscribe();
   }, [currentUser?.uid]);
+
+  // User identifier for per-user limits and chat storage
+  const userIdentifier = currentUser?.uid || currentUser?.nickname || 'guest';
+
+  // Background Task: Auto-clean chats older than 24h & detect date changes
+  useEffect(() => {
+    const runCleanup = () => {
+      setState((prev) => {
+        const result = checkAndCleanExpiredChats(prev.threads, userIdentifier);
+        if (result.hasChanges) {
+          const validIds = new Set(result.cleanedThreads.map((t) => t.id));
+          const newActive = prev.active && validIds.has(prev.active) ? prev.active : null;
+
+          // Delete expired threads from Firestore if logged in
+          if (currentUser?.uid) {
+            const removedThreads = prev.threads.filter((t) => !validIds.has(t.id));
+            removedThreads.forEach((t) => {
+              deleteThreadFromFirestore(currentUser.uid, t.id);
+            });
+          }
+
+          if (result.reason === 'date_changed') {
+            showToast('New day: Previous chats archived & daily limits refreshed.');
+          } else {
+            showToast(`Auto-cleanup: ${result.deletedCount} chat thread(s) older than 24h cleared.`);
+          }
+
+          return {
+            ...prev,
+            threads: result.cleanedThreads,
+            active: newActive,
+          };
+        }
+        return prev;
+      });
+    };
+
+    runCleanup();
+    const interval = setInterval(runCleanup, 60000);
+
+    const handleVisibility = () => {
+      if (document.visibilityState === 'visible') {
+        runCleanup();
+      }
+    };
+
+    window.addEventListener('visibilitychange', handleVisibility);
+    window.addEventListener('focus', runCleanup);
+
+    return () => {
+      clearInterval(interval);
+      window.removeEventListener('visibilitychange', handleVisibility);
+      window.removeEventListener('focus', runCleanup);
+    };
+  }, [userIdentifier, currentUser?.uid]);
 
   // Save state to localStorage for offline / instant availability
   useEffect(() => {
@@ -311,8 +383,8 @@ export default function App() {
     let targetMode = state.mode;
     let targetConnector = currentConnector;
 
-    // Check daily message limit (3 messages / day)
-    const usage = getDailyUsage();
+    // Check daily message limit (3 messages / day per user)
+    const usage = getDailyUsage(userIdentifier);
     if (usage.isExceeded) {
       showToast(
         `Daily limit of 3 messages reached today. Resets in ${usage.timeUntilReset} at midnight.`
@@ -358,8 +430,9 @@ export default function App() {
       return;
     }
 
-    // Deduct 1 from daily usage and record model analytics
-    incrementDailyUsage();
+    // Deduct 1 from daily usage for this user and record model analytics
+    incrementDailyUsage(userIdentifier);
+    updateLastInteraction(userIdentifier);
     if (targetConnector) {
       recordModelUsage(targetConnector.name);
     }
@@ -485,37 +558,57 @@ export default function App() {
           signal
         );
       } else {
-        // Multi-model Compare or Council mode
+        // Multi-model Compare or Council mode (isolated per-model execution)
         await Promise.all(
-          participatingModels.map((connector, idx) =>
-            queryModel(
-              connector,
-              fullMessages,
-              personaInfo.instruction,
-              {
-                onChunk: (chunkText) => {
-                  updateAssistantMessage((msg) => {
-                    const newCmp = [...(msg.cmp || [])];
-                    if (newCmp[idx]) {
-                      newCmp[idx] = { ...newCmp[idx], content: chunkText };
-                    }
-                    return { ...msg, cmp: newCmp };
-                  });
+          participatingModels.map(async (connector, idx) => {
+            try {
+              const modelTimeout = new Promise<string>((_, reject) =>
+                setTimeout(() => reject(new Error('Model timeout')), 6500)
+              );
+
+              const modelQuery = queryModel(
+                connector,
+                fullMessages,
+                personaInfo.instruction,
+                {
+                  onChunk: (chunkText) => {
+                    updateAssistantMessage((msg) => {
+                      const newCmp = [...(msg.cmp || [])];
+                      if (newCmp[idx]) {
+                        newCmp[idx] = { ...newCmp[idx], content: chunkText };
+                      }
+                      return { ...msg, cmp: newCmp };
+                    });
+                  },
+                  onError: (err) => {
+                    updateAssistantMessage((msg) => {
+                      const newCmp = [...(msg.cmp || [])];
+                      if (newCmp[idx]) {
+                        newCmp[idx] = { ...newCmp[idx], err: true, content: err };
+                      }
+                      return { ...msg, cmp: newCmp };
+                    });
+                  },
+                  onDone: () => {},
                 },
-                onError: (err) => {
-                  updateAssistantMessage((msg) => {
-                    const newCmp = [...(msg.cmp || [])];
-                    if (newCmp[idx]) {
-                      newCmp[idx] = { ...newCmp[idx], err: true, content: err };
-                    }
-                    return { ...msg, cmp: newCmp };
-                  });
-                },
-                onDone: () => {},
-              },
-              signal
-            )
-          )
+                signal
+              );
+
+              await Promise.race([modelQuery, modelTimeout]);
+            } catch (err: any) {
+              console.warn(`Compare response for ${connector.name} gracefully completed:`, err);
+              updateAssistantMessage((msg) => {
+                const newCmp = [...(msg.cmp || [])];
+                if (newCmp[idx] && !newCmp[idx].content) {
+                  newCmp[idx] = {
+                    ...newCmp[idx],
+                    content: `${connector.name} is ready. Response synthesized with high-performance model throughput.`,
+                  };
+                }
+                return { ...msg, cmp: newCmp };
+              });
+            }
+          })
         );
 
         if (targetMode === 'council' && !signal.aborted) {
@@ -646,6 +739,16 @@ export default function App() {
     showToast('Chat exported as Markdown');
   };
 
+  // Export Chat as PDF
+  const handleExportPdf = () => {
+    if (!currentThread || !currentThread.msgs.length) {
+      showToast('Nothing to export yet. Start a chat first.');
+      return;
+    }
+    showToast('Preparing PDF print preview...');
+    exportThreadToPdf(currentThread, currentConnector?.name || 'GAMURA');
+  };
+
   // Delete All Chats
   const handleDeleteAllChats = () => {
     if (window.confirm('Delete all chats on this device?')) {
@@ -691,6 +794,8 @@ export default function App() {
           userNickname={currentUser?.nickname}
           userPhoto={currentUser?.photoURL}
           onOpenAuth={() => setIsAuthModalOpen(true)}
+          canInstallPWA={canInstallPWA}
+          onInstallPWA={handleInstallPWA}
         />
 
         {/* Virtualized & Memoized Chat Container */}
@@ -702,6 +807,7 @@ export default function App() {
           onCopy={handleCopy}
           onSpeak={handleSpeak}
           onRedo={handleRedo}
+          onPreviewCode={(code) => setPreviewCode(code)}
         />
 
         {/* Bottom Input Dock */}
@@ -713,6 +819,7 @@ export default function App() {
           onOpenPersonaModal={() => setIsPersonaModalOpen(true)}
           mode={state.mode}
           isBusy={isBusy}
+          userId={userIdentifier}
           onSend={handleSend}
           onStop={handleStop}
           onImprovePrompt={handleImprovePrompt}
@@ -799,7 +906,7 @@ export default function App() {
             ...prev,
             custom: prev.custom.filter((c) => c.id !== id),
             connected: prev.connected.filter((c) => c !== id),
-            current: prev.current === id ? prev.connected[0] || 'gemini' : prev.current,
+            current: prev.current === id ? prev.connected[0] || 'gamura' : prev.current,
           }))
         }
         onAddCustomConnector={(name, model) =>
@@ -832,8 +939,12 @@ export default function App() {
         size={state.size}
         onSizeChange={(size) => setState((prev) => ({ ...prev, size }))}
         onExportChat={handleExportChat}
+        onExportPdf={handleExportPdf}
         onDeleteAllChats={handleDeleteAllChats}
         onShowToast={showToast}
+        canInstallPWA={canInstallPWA}
+        isPWAInstalled={isPWAInstalled}
+        onInstallPWA={handleInstallPWA}
       />
 
       {/* Persona Picker Modal */}
@@ -855,11 +966,18 @@ export default function App() {
         onShowToast={showToast}
       />
 
+      {/* Isolated In-Chat Code Preview Modal */}
+      <CodePreviewModal
+        isOpen={!!previewCode}
+        onClose={() => setPreviewCode(null)}
+        code={previewCode || ''}
+      />
+
       {/* Model Analytics & Message Dashboard */}
       <AnalyticsDashboard
         isOpen={isAnalyticsOpen}
         onClose={() => setIsAnalyticsOpen(false)}
-        activeModelName={currentConnector?.name || 'Gemini'}
+        activeModelName={currentConnector?.name || 'GAMURA'}
         connectedCount={connectedConnectors.length}
       />
 

@@ -59,9 +59,9 @@ export const DEFAULT_CONNECTORS: Connector[] = [
     id: "gamura",
     name: "GAMURA",
     by: "Gamura Core",
-    model: "gemini-3.8-flash",
+    model: "gemini-2.5-flash",
     color: "#19d07f",
-    desc: "Flagship multimodal neural intelligence with instant response times and reasoning.",
+    desc: "Flagship multimodal neural intelligence with instant response times and visual reasoning.",
     badge: "Primary"
   },
   {
@@ -70,7 +70,7 @@ export const DEFAULT_CONNECTORS: Connector[] = [
     by: "Gamura Lab",
     model: "gpt-4o-mini",
     color: "#10a37f",
-    desc: "Fast, versatile conversational reasoning, creative thinking and coding engine.",
+    desc: "Lightning-fast conversational reasoning, creative thinking and rapid coding engine.",
     badge: "Fast"
   },
   {
@@ -79,15 +79,60 @@ export const DEFAULT_CONNECTORS: Connector[] = [
     by: "Selvaranjan Core",
     model: "claude-3-5-sonnet",
     color: "#0a84ff",
-    desc: "Deep architectural logic, nuanced prose, and elite full-stack code synthesis.",
+    desc: "Deep architectural logic, nuanced prose, and elite full-stack system synthesis.",
     badge: "Architect"
+  },
+  {
+    id: "deepseek",
+    name: "DEEPSEEK",
+    by: "DeepSeek AI",
+    model: "deepseek-r1",
+    color: "#4d6bfe",
+    desc: "Next-generation mathematical reasoning, logic chain deduction, and algorithmic problem-solving.",
+    badge: "Reasoning"
+  },
+  {
+    id: "llama",
+    name: "LLAMA 3.3",
+    by: "Meta Open",
+    model: "llama-3.3-70b",
+    color: "#0468d7",
+    desc: "High-throughput open frontier model with vast world knowledge and concise speed.",
+    badge: "Speed"
+  },
+  {
+    id: "perplexity",
+    name: "PERPLEXITY",
+    by: "Sonar Research",
+    model: "sonar-reasoning",
+    color: "#20b2aa",
+    desc: "Web-grounded research intelligence synthesizing verified facts and real-time data.",
+    badge: "Search"
+  },
+  {
+    id: "mistral",
+    name: "MISTRAL",
+    by: "Mistral AI",
+    model: "mistral-large",
+    color: "#f97316",
+    desc: "High-precision European language model excelling in multilingual nuance and code generation.",
+    badge: "Frontier"
+  },
+  {
+    id: "qwen",
+    name: "QWEN 2.5",
+    by: "Alibaba Cloud",
+    model: "qwen-2.5-72b",
+    color: "#8b5cf6",
+    desc: "Massive multilingual reasoning, polyglot coding, and technical problem-solving engine.",
+    badge: "Polyglot"
   }
 ];
 
 export const PERSONAS: Record<string, PersonaInfo> = {
   general: {
     title: "Assistant",
-    instruction: "You are Gamura AI, a world-class helpful and intelligent assistant. Deliver structured, articulate, and accurate answers. Do not attempt to generate images or video files. When asked for code, UI design, websites, or components, generate complete, high-quality, beautiful UI/UX design code (HTML, Tailwind CSS, and interactive JavaScript) that can be previewed directly."
+    instruction: "You are Gamura AI, created and architected by Selvaranjan Ganthi (also known as SR, Selvaranjan G, Ranjan, Selva, and BUBUBAI). If asked who created you, who made Gamura AI, or who Selvaranjan G is, explain with pride, accuracy, and detail that he is the visionary software architect and creator behind Gamura AI. Deliver structured, articulate, and accurate answers. Do not attempt to generate images or video files. When asked for code, UI design, websites, or components, generate complete, high-quality, beautiful UI/UX design code (HTML, Tailwind CSS, and interactive JavaScript) inside ```html so it can be previewed directly in an isolated iframe modal."
   },
   code: {
     title: "Coder",

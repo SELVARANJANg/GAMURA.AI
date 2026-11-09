@@ -198,3 +198,78 @@ input, textarea {
 ::-webkit-scrollbar-thumb:hover {
   background: rgba(128, 128, 128, 0.45);
 }
+
+/* Prism.js Syntax Highlighting Theme */
+code[class*="language-"],
+pre[class*="language-"] {
+  color: #f8fafc;
+  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
+  text-align: left;
+  white-space: pre;
+  word-spacing: normal;
+  word-break: normal;
+  word-wrap: normal;
+  tab-size: 2;
+  hyphens: none;
+}
+
+.token.comment,
+.token.prolog,
+.token.doctype,
+.token.cdata {
+  color: #64748b;
+  font-style: italic;
+}
+
+.token.punctuation {
+  color: #94a3b8;
+}
+
+.token.property,
+.token.tag,
+.token.constant,
+.token.symbol,
+.token.deleted {
+  color: #f43f5e;
+}
+
+.token.boolean,
+.token.number {
+  color: #f59e0b;
+}
+
+.token.selector,
+.token.attr-name,
+.token.string,
+.token.char,
+.token.builtin,
+.token.inserted {
+  color: #10b981;
+}
+
+.token.operator,
+.token.entity,
+.token.url,
+.language-css .token.string,
+.style .token.string {
+  color: #38bdf8;
+}
+
+.token.atrule,
+.token.attr-value,
+.token.keyword {
+  color: #a855f7;
+  font-weight: 600;
+}
+
+.token.function,
+.token.class-name {
+  color: #38bdf8;
+}
+
+.token.regex,
+.token.important,
+.token.variable {
+  color: #eab308;
+}
+

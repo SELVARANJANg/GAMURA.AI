@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Search, Sparkles, CheckCheck } from 'lucide-react';
+import { Search, Sparkles, CheckCheck, FileText, Download, Smartphone } from 'lucide-react';
 import { Connector, ACCENTS } from '../types';
 
 interface ConnectorsSheetProps {
@@ -24,8 +24,12 @@ interface ConnectorsSheetProps {
   size: 's' | 'm' | 'l';
   onSizeChange: (size: 's' | 'm' | 'l') => void;
   onExportChat: () => void;
+  onExportPdf?: () => void;
   onDeleteAllChats: () => void;
   onShowToast: (msg: string) => void;
+  canInstallPWA?: boolean;
+  isPWAInstalled?: boolean;
+  onInstallPWA?: () => void;
 }
 
 export const ConnectorsSheet: React.FC<ConnectorsSheetProps> = ({
@@ -50,8 +54,12 @@ export const ConnectorsSheet: React.FC<ConnectorsSheetProps> = ({
   size,
   onSizeChange,
   onExportChat,
+  onExportPdf,
   onDeleteAllChats,
   onShowToast,
+  canInstallPWA,
+  isPWAInstalled,
+  onInstallPWA,
 }) => {
   const [searchQuery, setSearchQuery] = useState('');
   const [customName, setCustomName] = useState('');
@@ -382,11 +390,59 @@ export const ConnectorsSheet: React.FC<ConnectorsSheetProps> = ({
                 </div>
               </div>
 
+              {/* App & Installation Section */}
+              <p className="mx-5 mt-5 mb-1.5 text-[13px] text-[var(--mu)] font-semibold">
+                Progressive Web App
+              </p>
+              <div className="bg-[var(--bg2)] rounded-[16px] mx-4 overflow-hidden border border-[var(--ln)] divide-y divide-[var(--ln)] shadow-sm">
+                {canInstallPWA && onInstallPWA ? (
+                  <button
+                    onClick={() => {
+                      onInstallPWA();
+                    }}
+                    className="w-full text-left p-3.5 min-h-[54px] text-[14.5px] text-[var(--tx)] hover:bg-[var(--bg3)]/50 transition-colors font-medium flex items-center justify-between"
+                  >
+                    <div className="flex items-center gap-2.5">
+                      <Download className="w-4 h-4 text-[var(--ac)]" />
+                      <span>Install Gamura AI App (PWA)</span>
+                    </div>
+                    <span className="text-[12px] text-[var(--ac)] font-bold">Install</span>
+                  </button>
+                ) : isPWAInstalled ? (
+                  <div className="p-3.5 min-h-[54px] text-[14px] text-[var(--mu)] flex items-center justify-between">
+                    <div className="flex items-center gap-2.5">
+                      <Smartphone className="w-4 h-4 text-[var(--ac)]" />
+                      <span>Installed as Standalone Web App</span>
+                    </div>
+                    <span className="text-[11px] font-bold text-[var(--ac)] bg-[var(--ac)]/10 px-2 py-0.5 rounded-full">
+                      Active
+                    </span>
+                  </div>
+                ) : (
+                  <div className="p-3.5 min-h-[54px] text-[13px] text-[var(--mu)] flex items-center justify-between">
+                    <div className="flex items-center gap-2.5">
+                      <Smartphone className="w-4 h-4 text-[var(--mu)]" />
+                      <span>Installable via Browser Menu (Add to Home Screen)</span>
+                    </div>
+                  </div>
+                )}
+              </div>
+
               {/* Chats Section */}
               <p className="mx-5 mt-5 mb-1.5 text-[13px] text-[var(--mu)] font-semibold">
                 Chats & Privacy
               </p>
               <div className="bg-[var(--bg2)] rounded-[16px] mx-4 overflow-hidden border border-[var(--ln)] divide-y divide-[var(--ln)] shadow-sm">
+                <button
+                  onClick={onExportPdf}
+                  className="w-full text-left p-3.5 min-h-[54px] text-[14.5px] text-[var(--tx)] hover:bg-[var(--bg3)]/50 transition-colors font-medium flex items-center justify-between"
+                >
+                  <div className="flex items-center gap-2.5">
+                    <FileText className="w-4 h-4 text-[#0a84ff]" />
+                    <span>Export this chat as PDF (.pdf)</span>
+                  </div>
+                  <span className="text-[12px] text-[#0a84ff] font-semibold">Print / Save PDF</span>
+                </button>
                 <button
                   onClick={onExportChat}
                   className="w-full text-left p-3.5 min-h-[54px] text-[14.5px] text-[var(--tx)] hover:bg-[var(--bg3)]/50 transition-colors font-medium flex items-center justify-between"
